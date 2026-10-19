@@ -119,6 +119,9 @@ def append_bulk_sheet(worksheet_name, df_to_append):
                         df_to_append[col] = ""
                 df_to_append = df_to_append[existing_headers]
             
+            # PEMBERSIHAN OTOMATIS: Ganti nilai NaN / None / NaT menjadi string kosong agar patuh JSON
+            df_to_append = df_to_append.fillna("")
+            
             values = df_to_append.values.tolist()
             ws.append_rows(values)
             st.cache_data.clear()
