@@ -17,19 +17,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .main-header {
-        text-align: center;
-        color: #0d5c3b;
-        font-weight: 800;
-        font-size: 2.2rem;
-        margin-bottom: 0px;
-    }
-    .sub-header {
-        text-align: center;
-        color: #2e7d32;
-        font-size: 1rem;
-        margin-bottom: 20px;
-    }
     .card-box {
         background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
         border: 1px solid #bbf7d0;
@@ -139,30 +126,7 @@ if "user_admin" not in st.session_state:
     st.session_state.user_admin = False
 
 # ==========================================
-# 4. HEADER & STATUS
-# ==========================================
-st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
-
-col_h1, col_h2, col_h3 = st.columns([1.5, 1.5, 1])
-with col_h1:
-    st.markdown(f"📅 **Tanggal:** {datetime.now().strftime('%d %B %Y')}")
-with col_h2:
-    st.markdown(f"⏰ **Waktu:** {datetime.now().strftime('%H:%M:%S')} WIB")
-with col_h3:
-    if db_connected:
-        st.success("🟢 Google Sheets Terhubung")
-    else:
-        st.error("🔴 Terputus")
-
-if not db_connected and db_error_msg:
-    with st.expander("🔍 Detail Kendala Koneksi Database"):
-        st.code(db_error_msg)
-
-st.markdown("---")
-
-# ==========================================
-# 5. NAVIGASI
+# 4. NAVIGASI
 # ==========================================
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
@@ -255,7 +219,7 @@ def render_bank_soal_manager(key_prefix):
             current_data = df_bs_edit.iloc[row_idx]
             
             with st.form(f"form_edit_soal_{key_prefix}"):
-                e_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], index=["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"].index(current_data.get('Kelas', 'Kelas 1')) if current_data.get('Kelas') in ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"] else 0, key=f"{key_prefix}_e_kls")
+                e_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], index=0, key=f"{key_prefix}_e_kls")
                 e_mapel = st.text_input("Mata Pelajaran", value=str(current_data.get('Mapel', '')), key=f"{key_prefix}_e_mpl")
                 e_materi = st.text_input("Nama Materi", value=str(current_data.get('Nama_Materi', '')), key=f"{key_prefix}_e_mat")
                 e_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_e_kat")
@@ -281,7 +245,7 @@ def render_bank_soal_manager(key_prefix):
     st.dataframe(df_bs, use_container_width=True)
 
 # ==========================================
-# A. PORTAL SISWA (TAMPILAN UTAMA DIPERCANTIK)
+# A. PORTAL SISWA (TAMPILAN UTAMA BERSIH & FOKUS)
 # ==========================================
 if portal == "Portal Siswa":
     if st.session_state.user_siswa is None:
@@ -390,7 +354,6 @@ if portal == "Portal Siswa":
                     col_idx = idx % 10
                     with cols_peta[col_idx]:
                         status_jawab = st.session_state.jawaban_siswa.get(idx)
-                        # Biru jika terisi, Kuning jika belum
                         btn_type = "primary" if status_jawab else "secondary"
                         if st.button(f"{idx+1}", key=f"peta_{idx}", type=btn_type):
                             st.session_state.q_page = idx
