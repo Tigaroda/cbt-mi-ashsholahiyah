@@ -112,13 +112,20 @@ def append_bulk_sheet(worksheet_name, df_to_append):
     if db_connected and sh is not None:
         try:
             ws = sh.worksheet(worksheet_name)
+            existing_headers = ws.row_values(1)
+            if existing_headers:
+                for col in existing_headers:
+                    if col not in df_to_append.columns:
+                        df_to_append[col] = ""
+                df_to_append = df_to_append[existing_headers]
+            
             values = df_to_append.values.tolist()
             ws.append_rows(values)
             st.cache_data.clear()
-            return True
-        except Exception:
-            return False
-    return False
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+    return False, "Database belum terhubung"
 
 # ==========================================
 # 3. SESSION STATE
@@ -190,11 +197,12 @@ def render_bank_soal_manager(key_prefix):
                 st.write("Pratinjau Data:")
                 st.dataframe(df_up.head(3))
                 if st.button("Proses Upload ke Database", type="primary", key=f"{key_prefix}_btn"):
-                    if append_bulk_sheet("BankSoal", df_up):
+                    success, err_msg = append_bulk_sheet("BankSoal", df_up)
+                    if success:
                         st.success("Bank soal berhasil diupload ke Google Sheets!")
                         st.rerun()
                     else:
-                        st.error("Gagal mengupload soal.")
+                        st.error(f"Gagal mengupload soal. Detail: {err_msg}")
             except Exception as e:
                 st.error(f"Format file CSV tidak sesuai: {e}")
 
