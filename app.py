@@ -47,6 +47,8 @@ st.markdown("""
         margin: 10px auto;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+    .badge-terisi { background-color: #3b82f6; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; }
+    .badge-belum { background-color: #eab308; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -103,10 +105,10 @@ def write_sheet(worksheet_name, row_data):
             ws = sh.worksheet(worksheet_name)
             ws.append_row(row_data)
             st.cache_data.clear()
-            return True
-        except Exception:
-            return False
-    return False
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+    return False, "Database belum terhubung"
 
 def append_bulk_sheet(worksheet_name, df_to_append):
     if db_connected and sh is not None:
@@ -119,9 +121,7 @@ def append_bulk_sheet(worksheet_name, df_to_append):
                         df_to_append[col] = ""
                 df_to_append = df_to_append[existing_headers]
             
-            # PEMBERSIHAN OTOMATIS: Ganti nilai NaN / None / NaT menjadi string kosong agar patuh JSON
             df_to_append = df_to_append.fillna("")
-            
             values = df_to_append.values.tolist()
             ws.append_rows(values)
             st.cache_data.clear()
@@ -176,38 +176,106 @@ BANK_SOAL_COLS = [
 ]
 
 def render_bank_soal_manager(key_prefix):
-    st.markdown("### 📚 Kelola Bank Soal")
-    st.caption("Struktur Kolom: Kelas | Mapel | Nama_Materi | Kategori_Ujian | Tipe_Soal | Teks_Soal | Opsi_A | Opsi_B | Opsi_C | Opsi_D | Kunci")
+    st.markdown("### 📚 Kelola Bank Soal, Tambah & Edit")
     
-    col_1, col_2 = st.columns(2)
-    with col_1:
-        st.markdown("#### 📥 Download Template CSV")
-        template_df = pd.DataFrame(columns=BANK_SOAL_COLS)
-        csv_data = template_df.to_csv(index=False).encode('utf-8')
-        st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv", key=f"{key_prefix}_dl")
-        
-    with col_2:
-        st.markdown("#### 📤 Upload Soal Massal (.CSV)")
-        up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key=f"{key_prefix}_up")
-        if up_file is not None:
-            try:
+    tab_bs1, tab_bs2, tab_bs3 = st.tabs(["📂 Upload & Template", "➕ Tambah Soal Satuan", "✏️ Edit / Hapus Soal"])
+    
+    with tab_bs1:
+        col_1, col_2 = st.columns(2)
+        with col_1:
+            st.markdown("#### 📥 Download Template CSV")
+            template_df = pd.DataFrame(columns=BANK_SOAL_COLS)
+            csv_data = template_df.to_csv(index=False).encode('utf-8')
+            st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv", key=f"{key_prefix}_dl")
+            
+        with col_2:
+            st.markdown("#### 📤 Upload Soal Massal (.CSV)")
+            up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key=f"{key_prefix}_up")
+            if up_file is not None:
                 try:
-                    df_up = pd.read_csv(up_file, encoding='utf-8')
-                except UnicodeDecodeError:
-                    up_file.seek(0)
-                    df_up = pd.read_csv(up_file, encoding='latin-1')
-                    
-                st.write("Pratinjau Data:")
-                st.dataframe(df_up.head(3))
-                if st.button("Proses Upload ke Database", type="primary", key=f"{key_prefix}_btn"):
-                    success, err_msg = append_bulk_sheet("BankSoal", df_up)
+                    try:
+                        df_up = pd.read_csv(up_file, encoding='utf-8')
+                    except UnicodeDecodeError:
+                        up_file.seek(0)
+                        df_up = pd.read_csv(up_file, encoding='latin-1')
+                        
+                    st.write("Pratinjau Data:")
+                    st.dataframe(df_up.head(3))
+                    if st.button("Proses Upload ke Database", type="primary", key=f"{key_prefix}_btn"):
+                        success, err_msg = append_bulk_sheet("BankSoal", df_up)
+                        if success:
+                            st.success("Bank soal berhasil diupload ke Google Sheets!")
+                            st.rerun()
+                        else:
+                            st.error(f"Gagal mengupload soal. Detail: {err_msg}")
+                except Exception as e:
+                    st.error(f"Format file CSV tidak sesuai: {e}")
+
+    with tab_bs2:
+        st.markdown("#### ➕ Form Tambah Butir Soal Satuan")
+        with st.form(f"form_tambah_soal_{key_prefix}"):
+            c_ts1, c_ts2 = st.columns(2)
+            with c_ts1:
+                t_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], key=f"{key_prefix}_t_kls")
+                t_mapel = st.text_input("Mata Pelajaran", key=f"{key_prefix}_t_mpl")
+                t_materi = st.text_input("Nama Materi", key=f"{key_prefix}_t_mat")
+            with c_ts2:
+                t_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_t_kat")
+                t_tipe = st.selectbox("Tipe Soal", ["Pilihan Ganda"], key=f"{key_prefix}_t_tip")
+                t_kunci = st.selectbox("Kunci Jawaban", ["A", "B", "C", "D"], key=f"{key_prefix}_t_kun")
+            
+            t_teks = st.text_area("Teks Pertanyaan Soal", key=f"{key_prefix}_t_teks")
+            
+            co_a, co_b = st.columns(2)
+            with co_a:
+                t_opsi_a = st.text_input("Opsi A", key=f"{key_prefix}_t_oa")
+                t_opsi_c = st.text_input("Opsi C", key=f"{key_prefix}_t_oc")
+            with co_b:
+                t_opsi_b = st.text_input("Opsi B", key=f"{key_prefix}_t_ob")
+                t_opsi_d = st.text_input("Opsi D", key=f"{key_prefix}_t_od")
+                
+            if st.form_submit_button("Simpan Soal ke Database", type="primary"):
+                if t_mapel and t_teks:
+                    row_data = [t_kelas, t_mapel, t_materi, t_kategori, t_tipe, t_teks, t_opsi_a, t_opsi_b, t_opsi_c, t_opsi_d, t_kunci]
+                    success, err = write_sheet("BankSoal", row_data)
                     if success:
-                        st.success("Bank soal berhasil diupload ke Google Sheets!")
+                        st.success("Butir soal berhasil ditambahkan!")
                         st.rerun()
                     else:
-                        st.error(f"Gagal mengupload soal. Detail: {err_msg}")
-            except Exception as e:
-                st.error(f"Format file CSV tidak sesuai: {e}")
+                        st.error(f"Gagal menyimpan soal: {err}")
+                else:
+                    st.warning("Mata Pelajaran dan Teks Pertanyaan wajib diisi.")
+
+    with tab_bs3:
+        st.markdown("#### ✏️ Edit atau Perbarui Soal")
+        df_bs_edit = read_sheet("BankSoal")
+        if not df_bs_edit.empty and 'Teks_Soal' in df_bs_edit.columns:
+            soal_options = df_bs_edit['Teks_Soal'].dropna().tolist()
+            pilih_soal_edit = st.selectbox("Pilih Soal yang akan diedit:", soal_options, key=f"{key_prefix}_pilih_edit")
+            
+            row_idx = df_bs_edit[df_bs_edit['Teks_Soal'] == pilih_soal_edit].index[0]
+            current_data = df_bs_edit.iloc[row_idx]
+            
+            with st.form(f"form_edit_soal_{key_prefix}"):
+                e_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], index=["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"].index(current_data.get('Kelas', 'Kelas 1')) if current_data.get('Kelas') in ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"] else 0, key=f"{key_prefix}_e_kls")
+                e_mapel = st.text_input("Mata Pelajaran", value=str(current_data.get('Mapel', '')), key=f"{key_prefix}_e_mpl")
+                e_materi = st.text_input("Nama Materi", value=str(current_data.get('Nama_Materi', '')), key=f"{key_prefix}_e_mat")
+                e_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_e_kat")
+                e_teks = st.text_area("Teks Pertanyaan", value=str(current_data.get('Teks_Soal', '')), key=f"{key_prefix}_e_teks")
+                
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    e_oa = st.text_input("Opsi A", value=str(current_data.get('Opsi_A', '')), key=f"{key_prefix}_e_oa")
+                    e_oc = st.text_input("Opsi C", value=str(current_data.get('Opsi_C', '')), key=f"{key_prefix}_e_oc")
+                with ec2:
+                    e_ob = st.text_input("Opsi B", value=str(current_data.get('Opsi_B', '')), key=f"{key_prefix}_e_ob")
+                    e_od = st.text_input("Opsi D", value=str(current_data.get('Opsi_D', '')), key=f"{key_prefix}_e_od")
+                e_kunci = st.text_input("Kunci Jawaban (A/B/C/D)", value=str(current_data.get('Kunci', '')), key=f"{key_prefix}_e_kun")
+                
+                if st.form_submit_button("Simpan Perubahan Soal", type="primary"):
+                    st.info("Fitur pembaruan baris langsung di Google Sheets akan segera disinkronkan. Silakan edit via file Google Spreadsheet untuk sementara atau hapus dan buat baru.")
+        else:
+            st.info("Belum ada data soal untuk diedit.")
 
     st.markdown("---")
     st.markdown("#### 📋 Data Bank Soal Terdaftar di Database")
@@ -215,7 +283,7 @@ def render_bank_soal_manager(key_prefix):
     st.dataframe(df_bs, use_container_width=True)
 
 # ==========================================
-# A. PORTAL SISWA
+# A. PORTAL SISWA (Satu Soal Satu Halaman & Peta Soal)
 # ==========================================
 if portal == "Portal Siswa":
     if st.session_state.user_siswa is None:
@@ -261,7 +329,7 @@ if portal == "Portal Siswa":
             st.rerun()
             
         st.markdown("---")
-        st.subheader("📝 Ruang Pelaksanaan Ujian")
+        st.subheader("📝 Ruang Pelaksanaan Ujian Online")
         
         df_bank = read_sheet("BankSoal")
         if not df_bank.empty and 'Mapel' in df_bank.columns:
@@ -270,7 +338,7 @@ if portal == "Portal Siswa":
                 df_kelas = df_bank 
                 
             mapel_list = df_kelas['Mapel'].unique().tolist()
-            pilih_mapel = st.selectbox("Pilih Mata Pelajaran:", mapel_list)
+            pilih_mapel = st.selectbox("Pilih Mata Pelajaran Ujian:", mapel_list)
             
             materi_list = df_kelas[df_kelas['Mapel'] == pilih_mapel]['Nama_Materi'].unique().tolist()
             pilih_materi = st.selectbox("Pilih Nama Materi Ujian:", materi_list)
@@ -283,24 +351,65 @@ if portal == "Portal Siswa":
                 (df_kelas['Mapel'] == pilih_mapel) & 
                 (df_kelas['Nama_Materi'] == pilih_materi) & 
                 (df_kelas['Kategori_Ujian'] == pilih_kategori)
-            ]
+            ].reset_index(drop=True)
             
             if not soal_aktif.empty:
-                st.markdown(f"#### 📄 Lembar Soal: {pilih_mapel} - {pilih_materi} ({pilih_kategori})")
-                for idx, row in soal_aktif.reset_index(drop=True).iterrows():
-                    st.markdown(f"**Soal No. {idx+1}**")
-                    st.write(row.get('Teks_Soal', ''))
-                    st.radio(
-                        f"Pilih Jawaban (Soal {idx+1}):",
-                        [f"A. {row.get('Opsi_A', '')}", 
-                         f"B. {row.get('Opsi_B', '')}", 
-                         f"C. {row.get('Opsi_C', '')}", 
-                         f"D. {row.get('Opsi_D', '')}"],
-                        key=f"ans_s_{idx}"
-                    )
-                    st.markdown("---")
+                total_soal = len(soal_aktif)
                 
-                if st.button("Selesai & Kirim Jawaban Ujian", type="primary"):
+                # Inisialisasi state jawaban siswa
+                if "jawaban_siswa" not in st.session_state:
+                    st.session_state.jawaban_siswa = {}
+                if "q_page" not in st.session_state:
+                    st.session_state.q_page = 0
+                
+                # --- PETA NOMOR SOAL ---
+                st.markdown("#### 🗺️ Peta Nomor Soal")
+                cols_peta = st.columns(min(total_soal, 10))
+                for idx in range(total_soal):
+                    col_idx = idx % 10
+                    with cols_peta[col_idx]:
+                        status_jawab = st.session_state.jawaban_siswa.get(idx)
+                        warna_btn = "blue" if status_jawab else "secondary"
+                        if st.button(f"{idx+1}", key=f"peta_{idx}", type="primary" if status_jawab else "secondary"):
+                            st.session_state.q_page = idx
+                            st.rerun()
+                
+                st.markdown("---")
+                curr_page = st.session_state.q_page
+                row_soal = soal_aktif.iloc[curr_page]
+                
+                st.markdown(f"### Pertanyaan No. {curr_page + 1} dari {total_soal}")
+                st.write(row_soal.get('Teks_Soal', ''))
+                
+                opsi_pilihan = [
+                    f"A. {row_soal.get('Opsi_A', '')}",
+                    f"B. {row_soal.get('Opsi_B', '')}",
+                    f"C. {row_soal.get('Opsi_C', '')}",
+                    f"D. {row_soal.get('Opsi_D', '')}"
+                ]
+                
+                ans_key = f"ans_soal_{curr_page}"
+                val_terpilih = st.radio("Pilih Jawaban Anda:", opsi_pilihan, key=ans_key, index=0)
+                
+                # Simpan jawaban
+                if val_terpilih:
+                    st.session_state.jawaban_siswa[curr_page] = val_terpilih
+                
+                st.markdown("---")
+                col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+                with col_nav1:
+                    if curr_page > 0:
+                        if st.button("⬅️ Sebelumnya"):
+                            st.session_state.q_page -= 1
+                            st.rerun()
+                with col_nav3:
+                    if curr_page < total_soal - 1:
+                        if st.button("Selanjutnya ➡️"):
+                            st.session_state.q_page += 1
+                            st.rerun()
+                
+                st.markdown("---")
+                if st.button("Selesai & Kirim Semua Jawaban Ujian", type="primary"):
                     st.balloons()
                     st.success("Jawaban Ujian Berhasil Dikirim ke Server!")
             else:
@@ -352,7 +461,7 @@ elif portal == "Ruang Guru Kelas":
             render_bank_soal_manager("guru")
 
         with t2:
-            st.markdown("### 🚀 Atur Pelaksanaan Ujian Berdasarkan Materi")
+            st.markdown("### 🚀 Atur Pelaksanaan Ujian & Ceklis Pemilihan Soal")
             df_b = read_sheet("BankSoal")
             if not df_b.empty and 'Kelas' in df_b.columns and len(df_b) > 0:
                 col_g1, col_g2 = st.columns(2)
@@ -371,29 +480,41 @@ elif portal == "Ruang Guru Kelas":
                     p_stat = st.selectbox("Status Pelaksanaan", ["Dibuka (Live)", "Ditutup"], key="g_stat")
                 
                 st.markdown("---")
-                preview_soal = df_b[(df_b['Kelas'] == p_kls) & (df_b['Mapel'] == p_mapel) & (df_b['Nama_Materi'] == p_mat) & (df_b['Kategori_Ujian'] == p_kat)]
-                st.info(f"Jumlah soal terpilih untuk ujian ini: **{len(preview_soal)} Soal**")
+                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Ujian Ini")
+                soal_filter_g = df_b[(df_b['Kelas'] == p_kls) & (df_b['Mapel'] == p_mapel) & (df_b['Nama_Materi'] == p_mat) & (df_b['Kategori_Ujian'] == p_kat)]
                 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("Simpan & Siarkan Ujian ke Siswa", type="primary", key="g_siar"):
-                        st.success("Ujian berhasil disiarkan ke portal siswa!")
-                with col_btn2:
-                    if not preview_soal.empty:
-                        pdf_text = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {p_mapel} | MATERI: {p_mat} | KATEGORI: {p_kat}\n" + "="*50 + "\n\n"
-                        for idx, row in preview_soal.reset_index(drop=True).iterrows():
-                            pdf_text += f"{idx+1}. {row.get('Teks_Soal', '')}\n"
-                            pdf_text += f"   A. {row.get('Opsi_A', '')}\n   B. {row.get('Opsi_B', '')}\n   C. {row.get('Opsi_C', '')}\n   D. {row.get('Opsi_D', '')}\n"
-                            pdf_text += f"   Kunci: {row.get('Kunci', '')}\n\n"
-                        st.download_button(
-                            label="📄 Download Soal (.TXT / Arsip PDF)",
-                            data=pdf_text.encode('utf-8'),
-                            file_name=f"Soal_{p_mapel}_{p_mat}_{p_kat}.txt".replace(" ", "_"),
-                            mime="text/plain",
-                            key="g_dl_pdf"
-                        )
+                if not soal_filter_g.empty:
+                    selected_indices = []
+                    for s_idx, s_row in soal_filter_g.reset_index(drop=True).iterrows():
+                        is_checked = st.checkbox(f"Soal {s_idx+1}: {s_row.get('Teks_Soal', '')[:75]}...", value=True, key=f"chk_g_{s_idx}")
+                        if is_checked:
+                            selected_indices.append(s_idx)
+                    
+                    preview_soal = soal_filter_g.iloc[selected_indices]
+                    st.info(f"Total soal terpilih untuk diujikan: **{len(preview_soal)} Soal**")
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("Simpan & Siarkan Ujian ke Siswa", type="primary", key="g_siar"):
+                            st.success("Ujian berhasil disiarkan ke portal siswa!")
+                    with col_btn2:
+                        if not preview_soal.empty:
+                            pdf_text = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {p_mapel} | MATERI: {p_mat} | KATEGORI: {p_kat}\n" + "="*50 + "\n\n"
+                            for idx, row in preview_soal.reset_index(drop=True).iterrows():
+                                pdf_text += f"{idx+1}. {row.get('Teks_Soal', '')}\n"
+                                pdf_text += f"   A. {row.get('Opsi_A', '')}\n   B. {row.get('Opsi_B', '')}\n   C. {row.get('Opsi_C', '')}\n   D. {row.get('Opsi_D', '')}\n"
+                                pdf_text += f"   Kunci: {row.get('Kunci', '')}\n\n"
+                            st.download_button(
+                                label="📄 Download Soal (.TXT / Arsip PDF)",
+                                data=pdf_text.encode('utf-8'),
+                                file_name=f"Soal_{p_mapel}_{p_mat}_{p_kat}.txt".replace(" ", "_"),
+                                mime="text/plain",
+                                key="g_dl_pdf"
+                            )
+                else:
+                    st.warning("Tidak ada soal yang cocok dengan filter tersebut.")
             else:
-                st.warning("Belum ada data Bank Soal atau kolom belum lengkap di Google Sheets.")
+                st.warning("Belum ada data Bank Soal di Google Sheets.")
 
         with t3:
             st.markdown("### 🖨️ Cetak Kartu Peserta Ujian")
@@ -493,7 +614,7 @@ elif portal == "Ruang Admin Master":
             render_bank_soal_manager("admin")
 
         with ta4:
-            st.markdown("### ⚙️ Kontrol Pelaksanaan Ujian & Download Soal (Master)")
+            st.markdown("### ⚙️ Kontrol Pelaksanaan Ujian & Ceklis Pemilihan Soal (Master)")
             df_b_ad = read_sheet("BankSoal")
             if not df_b_ad.empty and 'Kelas' in df_b_ad.columns and len(df_b_ad) > 0:
                 col_ad1, col_ad2 = st.columns(2)
@@ -512,27 +633,39 @@ elif portal == "Ruang Admin Master":
                     ad_stat = st.selectbox("Status Ujian", ["Dibuka (Live)", "Ditutup"], key="ad_stat")
                 
                 st.markdown("---")
-                preview_ad = df_b_ad[(df_b_ad['Kelas'] == ad_kls) & (df_b_ad['Mapel'] == ad_mapel) & (df_b_ad['Nama_Materi'] == ad_mat) & (df_b_ad['Kategori_Ujian'] == ad_kat)]
-                st.info(f"Jumlah soal terpilih: **{len(preview_ad)} Soal**")
+                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Ujian Ini")
+                soal_filter_ad = df_b_ad[(df_b_ad['Kelas'] == ad_kls) & (df_b_ad['Mapel'] == ad_mapel) & (df_b_ad['Nama_Materi'] == ad_mat) & (df_b_ad['Kategori_Ujian'] == ad_kat)]
                 
-                c_btn1, c_btn2 = st.columns(2)
-                with c_btn1:
-                    if st.button("Terapkan & Siarkan Sesi Ujian", type="primary", key="ad_siar"):
-                        st.success("Sesi ujian berhasil disiarkan!")
-                with c_btn2:
-                    if not preview_ad.empty:
-                        pdf_txt_ad = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {ad_mapel} | MATERI: {ad_mat} | KATEGORI: {ad_kat}\n" + "="*50 + "\n\n"
-                        for idx, row in preview_ad.reset_index(drop=True).iterrows():
-                            pdf_txt_ad += f"{idx+1}. {row.get('Teks_Soal', '')}\n"
-                            pdf_txt_ad += f"   A. {row.get('Opsi_A', '')}\n   B. {row.get('Opsi_B', '')}\n   C. {row.get('Opsi_C', '')}\n   D. {row.get('Opsi_D', '')}\n"
-                            pdf_txt_ad += f"   Kunci: {row.get('Kunci', '')}\n\n"
-                        st.download_button(
-                            label="📄 Download Soal (.TXT / Arsip PDF)",
-                            data=pdf_txt_ad.encode('utf-8'),
-                            file_name=f"Soal_{ad_mapel}_{ad_mat}_{ad_kat}.txt".replace(" ", "_"),
-                            mime="text/plain",
-                            key="ad_dl_pdf"
-                        )
+                if not soal_filter_ad.empty:
+                    selected_indices_ad = []
+                    for s_idx, s_row in soal_filter_ad.reset_index(drop=True).iterrows():
+                        is_checked = st.checkbox(f"Soal {s_idx+1}: {s_row.get('Teks_Soal', '')[:75]}...", value=True, key=f"chk_ad_{s_idx}")
+                        if is_checked:
+                            selected_indices_ad.append(s_idx)
+                    
+                    preview_ad = soal_filter_ad.iloc[selected_indices_ad]
+                    st.info(f"Jumlah soal terpilih: **{len(preview_ad)} Soal**")
+                    
+                    c_btn1, c_btn2 = st.columns(2)
+                    with c_btn1:
+                        if st.button("Terapkan & Siarkan Sesi Ujian", type="primary", key="ad_siar"):
+                            st.success("Sesi ujian berhasil disiarkan!")
+                    with c_btn2:
+                        if not preview_ad.empty:
+                            pdf_txt_ad = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {ad_mapel} | MATERI: {ad_mat} | KATEGORI: {ad_kat}\n" + "="*50 + "\n\n"
+                            for idx, row in preview_ad.reset_index(drop=True).iterrows():
+                                pdf_txt_ad += f"{idx+1}. {row.get('Teks_Soal', '')}\n"
+                                pdf_txt_ad += f"   A. {row.get('Opsi_A', '')}\n   B. {row.get('Opsi_B', '')}\n   C. {row.get('Opsi_C', '')}\n   D. {row.get('Opsi_D', '')}\n"
+                                pdf_txt_ad += f"   Kunci: {row.get('Kunci', '')}\n\n"
+                            st.download_button(
+                                label="📄 Download Soal (.TXT / Arsip PDF)",
+                                data=pdf_txt_ad.encode('utf-8'),
+                                file_name=f"Soal_{ad_mapel}_{ad_mat}_{ad_kat}.txt".replace(" ", "_"),
+                                mime="text/plain",
+                                key="ad_dl_pdf"
+                            )
+                else:
+                    st.warning("Tidak ada soal yang cocok dengan filter tersebut.")
             else:
                 st.warning("Belum ada data Bank Soal atau kolom tabel belum sesuai di Google Sheets.")
 
