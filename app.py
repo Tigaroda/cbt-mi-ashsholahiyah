@@ -150,7 +150,55 @@ st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
 
 # ==========================================
-# A. PORTAL SISWA (Sinkronisasi Pelaksanaan Ujian)
+# HELPER: TEMPLATE BANK SOAL STRUKTUR BARU
+# ==========================================
+BANK_SOAL_COLS = [
+    "Kelas", "Mapel", "Nama_Materi", "Kategori_Ujian", 
+    "Tipe_Soal", "Teks_Soal", "Opsi_A", "Opsi_B", 
+    "Opsi_C", "Opsi_D", "Kunci"
+]
+
+def render_bank_soal_manager(key_prefix):
+    st.markdown("### 📚 Kelola Bank Soal (Format Header Baru)")
+    st.caption("Header: Kelas | Mapel | Nama_Materi | Kategori_Ujian | Tipe_Soal | Teks_Soal | Opsi_A | Opsi_B | Opsi_C | Opsi_D | Kunci")
+    
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        st.markdown("#### 📥 Download Template CSV")
+        template_df = pd.DataFrame(columns=BANK_SOAL_COLS)
+        csv_data = template_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Unduh Template CSV Soal",
+            data=csv_data,
+            file_name="template_bank_soal_baru.csv",
+            mime="text/csv",
+            key=f"{key_prefix}_dl"
+        )
+        
+    with col_2:
+        st.markdown("#### 📤 Upload Soal Massal (.CSV)")
+        up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key=f"{key_prefix}_up")
+        if up_file is not None:
+            try:
+                df_up = pd.read_csv(up_file)
+                st.write("Pratinjau Data:")
+                st.dataframe(df_up.head(3))
+                if st.button("Proses Upload ke Database", type="primary", key=f"{key_prefix}_btn"):
+                    if append_bulk_sheet("BankSoal", df_up):
+                        st.success("Bank soal berhasil diupload ke Google Sheets!")
+                        st.rerun()
+                    else:
+                        st.error("Gagal mengupload soal ke database.")
+            except Exception as e:
+                st.error(f"Format file CSV tidak sesuai: {e}")
+
+    st.markdown("---")
+    st.markdown("#### 📋 Data Bank Soal Terdaftar")
+    df_bs = read_sheet("BankSoal")
+    st.dataframe(df_bs, use_container_width=True)
+
+# ==========================================
+# A. PORTAL SISWA
 # ==========================================
 if portal == "Portal Siswa":
     if st.session_state.user_siswa is None:
@@ -196,49 +244,38 @@ if portal == "Portal Siswa":
             st.rerun()
             
         st.markdown("---")
-        st.subheader("📝 Ruang Pelaksanaan Ujian Aktif")
+        st.subheader("📝 Ruang Ujian Siswa")
         
-        # Ambil data bank soal yang aktif dari database
         df_bank = read_sheet("BankSoal")
-        if not df_bank.empty:
-            mapel_tersedia = df_bank['mapel'].unique().tolist() if 'mapel' in df_bank.columns else ["Koding & Kecerdasan Artifisial"]
-            pilih_mapel_ujian = st.selectbox("Pilih Mata Pelajaran Ujian:", mapel_tersedia)
+        if not df_bank.empty and 'Mapel' in df_bank.columns:
+            mapel_list = df_bank['Mapel'].unique().tolist()
+            pilih_mapel = st.selectbox("Pilih Mata Pelajaran Ujian:", mapel_list)
             
-            st.markdown(f"#### 📄 Lembar Soal: {pilih_mapel_ujian}")
-            soal_mapel = df_bank[df_bank['mapel'] == pilih_mapel_ujian] if 'mapel' in df_bank.columns else df_bank
-            
-            if not soal_mapel.empty:
-                for idx, row in soal_mapel.iterrows():
-                    st.markdown(f"**Soal No. {row.get('no_soal', idx+1)}**")
-                    st.write(row.get('pertanyaan', 'Pertanyaan tidak tersedia'))
+            soal_filtered = df_bank[df_bank['Mapel'] == pilih_mapel]
+            if not soal_filtered.empty:
+                for idx, row in soal_filtered.reset_index(drop=True).iterrows():
+                    st.markdown(f"**Soal No. {idx+1} ({row.get('Nama_Materi', 'Umum')})**")
+                    st.write(row.get('Teks_Soal', 'Pertanyaan tidak tersedia'))
                     st.radio(
                         f"Pilih Jawaban (Soal {idx+1}):",
-                        [f"A. {row.get('pilihan_a', '')}", 
-                         f"B. {row.get('pilihan_b', '')}", 
-                         f"C. {row.get('pilihan_c', '')}", 
-                         f"D. {row.get('pilihan_d', '')}"],
-                        key=f"ans_{idx}"
+                        [f"A. {row.get('Opsi_A', '')}", 
+                         f"B. {row.get('Opsi_B', '')}", 
+                         f"C. {row.get('Opsi_C', '')}", 
+                         f"D. {row.get('Opsi_D', '')}"],
+                        key=f"s_{idx}"
                     )
                     st.markdown("---")
             else:
-                st.warning("Belum ada butir soal untuk mata pelajaran ini.")
+                st.warning("Belum ada soal terdaftar untuk mata pelajaran ini.")
         else:
-            st.info("Sistem sedang menunggu unggahan Bank Soal dari Guru/Admin.")
-            st.radio(
-                "Simulasi Soal (KKA):",
-                ["A. Memberikan urutan langkah kerja otomatis kepada komputer",
-                 "B. Membersihkan layar komputer secara fisik",
-                 "C. Mengganti daya listrik menjadi suara",
-                 "D. Menghapus file secara permanen"],
-                key="soal_simulasi"
-            )
+            st.info("Sistem belum memuat Bank Soal terbaru dari Google Sheets.")
             
         if st.button("Selesai & Kirim Jawaban Ujian", type="primary"):
             st.balloons()
-            st.success("Jawaban Ujian Berhasil Dikirim ke Server!")
+            st.success("Jawaban Ujian Berhasil Dikirim!")
 
 # ==========================================
-# B. RUANG GURU KELAS (Bank Soal & Pelaksanaan Ujian)
+# B. RUANG GURU KELAS
 # ==========================================
 elif portal == "Ruang Guru Kelas":
     if st.session_state.user_guru is None:
@@ -282,35 +319,10 @@ elif portal == "Ruang Guru Kelas":
             st.dataframe(read_sheet("Siswa"), use_container_width=True)
             
         with t2:
-            st.markdown("### 📚 Kelola Bank Soal (14 Mapel Kurikulum Merdeka)")
-            st.caption("Mapel: Akidah Akhlak, Al-Qur'an Hadits, Fikih, SKI, Pancasila, Bahasa Indonesia, IPAS, Matematika, PJOK, SBdP, Bahasa Arab, Bahasa Sunda, Bahasa Inggris, KKA.")
-            
-            col_gd1, col_gd2 = st.columns(2)
-            with col_gd1:
-                st.markdown("#### 📥 Download Template")
-                template_df = pd.DataFrame(columns=["mapel", "kelas", "no_soal", "pertanyaan", "pilihan_a", "pilihan_b", "pilihan_c", "pilihan_d", "kunci_jawaban"])
-                csv_data = template_df.to_csv(index=False).encode('utf-8')
-                st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv")
-            
-            with col_gd2:
-                st.markdown("#### 📤 Upload Soal Massal (.CSV)")
-                up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key="up_guru")
-                if up_file is not None:
-                    try:
-                        df_up = pd.read_csv(up_file)
-                        st.dataframe(df_up.head(3))
-                        if st.button("Proses Upload ke Database", type="primary", key="btn_up_g"):
-                            if append_bulk_sheet("BankSoal", df_up):
-                                st.success("Bank soal berhasil diupload!")
-                                st.rerun()
-                    except Exception as e:
-                        st.error(f"Format file salah: {e}")
-            st.markdown("---")
-            st.dataframe(read_sheet("BankSoal"), use_container_width=True)
+            render_bank_soal_manager("guru")
 
         with t3:
             st.markdown("### 🚀 Kontrol Pelaksanaan Ujian (Live Status)")
-            st.info("Atur jadwal dan status ujian yang sedang berlangsung agar siswa dapat langsung mengakses soal.")
             c_u1, c_u2 = st.columns(2)
             with c_u1:
                 st.selectbox("Pilih Mata Pelajaran Ujian", ["Koding & Kecerdasan Artifisial", "Matematika", "IPAS", "Bahasa Indonesia", "Pancasila"])
@@ -324,7 +336,7 @@ elif portal == "Ruang Guru Kelas":
             st.info("Belum ada rekapitulasi nilai yang masuk hari ini.")
 
 # ==========================================
-# C. RUANG ADMIN MASTER (Kontrol Penuh & Pelaksanaan)
+# C. RUANG ADMIN MASTER
 # ==========================================
 elif portal == "Ruang Admin Master":
     if not st.session_state.user_admin:
@@ -387,31 +399,7 @@ elif portal == "Ruang Admin Master":
                             st.rerun()
                             
         with ta3:
-            st.markdown("### 📚 Kelola Bank Soal (14 Mapel Kurikulum Merdeka)")
-            st.caption("Mapel: Akidah Akhlak, Al-Qur'an Hadits, Fikih, SKI, Pancasila, Bahasa Indonesia, IPAS, Matematika, PJOK, SBdP, Bahasa Arab, Bahasa Sunda, Bahasa Inggris, KKA.")
-            
-            col_ad1, col_ad2 = st.columns(2)
-            with col_ad1:
-                st.markdown("#### 📥 Download Template")
-                template_df = pd.DataFrame(columns=["mapel", "kelas", "no_soal", "pertanyaan", "pilihan_a", "pilihan_b", "pilihan_c", "pilihan_d", "kunci_jawaban"])
-                csv_data = template_df.to_csv(index=False).encode('utf-8')
-                st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv", key="dl_admin")
-            
-            with col_ad2:
-                st.markdown("#### 📤 Upload Soal Massal (.CSV)")
-                up_file_ad = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key="up_admin")
-                if up_file_ad is not None:
-                    try:
-                        df_up_ad = pd.read_csv(up_file_ad)
-                        st.dataframe(df_up_ad.head(3))
-                        if st.button("Proses Upload ke Database", type="primary", key="btn_up_ad"):
-                            if append_bulk_sheet("BankSoal", df_up_ad):
-                                st.success("Bank soal berhasil diupload!")
-                                st.rerun()
-                    except Exception as e:
-                        st.error(f"Format file salah: {e}")
-            st.markdown("---")
-            st.dataframe(read_sheet("BankSoal"), use_container_width=True)
+            render_bank_soal_manager("admin")
 
         with ta4:
             st.markdown("### ⚙️ Pengaturan & Kontrol Pelaksanaan Ujian (Master)")
