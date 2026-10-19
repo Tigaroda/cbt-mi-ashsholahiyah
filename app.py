@@ -40,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (ROBUST PEM FIX)
+# 2. KONEKSI GOOGLE SHEETS API (PEM AUTO-FIX)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -50,12 +50,9 @@ def init_gsheets():
     ]
     creds_dict = dict(st.secrets["gsheets"])
     if "private_key" in creds_dict:
-        pk = creds_dict["private_key"]
+        pk = str(creds_dict["private_key"])
+        # Mengubah literal '\n' menjadi karakter newline asli
         pk = pk.replace("\\n", "\n")
-        if not pk.startswith("-----BEGIN PRIVATE KEY-----"):
-            pk = "-----BEGIN PRIVATE KEY-----\n" + pk
-        if not pk.endswith("-----END PRIVATE KEY-----"):
-            pk = pk + "\n-----END PRIVATE KEY-----"
         creds_dict["private_key"] = pk
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
@@ -96,7 +93,7 @@ def write_sheet(worksheet_name, row_data):
     return False
 
 # ==========================================
-# 3. SESSION STATE INIALIZATION
+# 3. SESSION STATE INITIALIZATION
 # ==========================================
 if "user_siswa" not in st.session_state:
     st.session_state.user_siswa = None
@@ -280,7 +277,7 @@ elif portal == "Ruang Admin Master":
             st.session_state.user_admin = False
             st.rerun()
             
-        ta1, ta2, ta3, ta4 = st.tabs(["Database Siswa", "Database Guru", "14 Bank Soal Mapel", "Keamanan OTP WA"])
+        ta1, ta2, ta3 = st.tabs(["Database Siswa", "Database Guru", "14 Bank Soal Mapel"])
         
         with ta1:
             st.markdown("### Database Siswa Terdaftar")
@@ -324,8 +321,3 @@ elif portal == "Ruang Admin Master":
             st.markdown("### Bank Soal (14 Mapel Kurikulum Merdeka)")
             st.caption("Mapel: Akidah Akhlak, Al-Qur'an Hadits, Fikih, SKI, Pancasila, Bahasa Indonesia, IPAS, Matematika, PJOK, SBdP, Bahasa Arab, Bahasa Sunda, Bahasa Inggris, KKA.")
             st.dataframe(read_sheet("BankSoal"), use_container_width=True)
-            
-        with ta4:
-            st.markdown("### Keamanan 2FA OTP WhatsApp")
-            st.info("Nomor Admin Terdaftar: **085719824453**")
-            st.success("WhatsApp Gateway Status: Siap Digunakan")
