@@ -6,7 +6,7 @@ from datetime import datetime
 import textwrap
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & TEMA
+# 1. KONFIGURASI HALAMAN & TEMA (Pearl Silver & Hijau Emerald)
 # ==========================================
 st.set_page_config(
     page_title="CBT MI Ashsholahiyah Cilamaya",
@@ -17,6 +17,19 @@ st.set_page_config(
 
 st.markdown("""
     <style>
+    .main-header {
+        text-align: center;
+        color: #0d5c3b;
+        font-weight: 800;
+        font-size: 2.2rem;
+        margin-bottom: 0px;
+    }
+    .sub-header {
+        text-align: center;
+        color: #1e3a8a;
+        font-size: 1rem;
+        margin-bottom: 15px;
+    }
     .card-box {
         background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
         border: 1px solid #bbf7d0;
@@ -136,10 +149,39 @@ if "sedang_ujian" not in st.session_state:
     st.session_state.sedang_ujian = False
 
 # ==========================================
-# 4. NAVIGASI
+# 4. WIDGET REAL-TIME HEADER
+# ==========================================
+st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
+
+col_h1, col_h2, col_h3 = st.columns([1.5, 1.5, 1])
+with col_h1:
+    st.markdown(f"📅 **Tanggal:** {datetime.now().strftime('%d %B %Y')}")
+with col_h2:
+    st.markdown(f"⏰ **Waktu:** {datetime.now().strftime('%H:%M:%S')} WIB")
+with col_h3:
+    if db_connected:
+        st.success("🟢 Google Sheets Terhubung")
+    else:
+        st.error("🔴 Terputus")
+
+if not db_connected and db_error_msg:
+    with st.expander("🔍 Detail Kendala Koneksi Database"):
+        st.code(db_error_msg)
+
+st.markdown("---")
+
+# ==========================================
+# 5. NAVIGASI UTAMA
 # ==========================================
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
+
+LIST_MAPEL = [
+    "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
+    "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
+    "PJOK", "SBdP", "Bahasa Arab", "Bahasa Sunda", "Bahasa Inggris", "Koding dan Kecerdasan Artifisial (KKA)"
+]
 
 BANK_SOAL_COLS = [
     "Kelas", "Mapel", "Nama_Materi", "Kategori_Ujian", 
@@ -148,7 +190,7 @@ BANK_SOAL_COLS = [
 ]
 
 def render_bank_soal_manager(key_prefix):
-    st.markdown("### 📚 Kelola Bank Soal, Tambah & Edit")
+    st.markdown("### 📚 Kelola Bank Soal (14 Mata Pelajaran)")
     tab_bs1, tab_bs2, tab_bs3 = st.tabs(["📂 Upload & Template", "➕ Tambah Soal Satuan", "✏️ Edit / Hapus Soal"])
     
     with tab_bs1:
@@ -186,8 +228,8 @@ def render_bank_soal_manager(key_prefix):
             c_ts1, c_ts2 = st.columns(2)
             with c_ts1:
                 t_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], key=f"{key_prefix}_t_kls")
-                t_mapel = st.text_input("Mata Pelajaran", key=f"{key_prefix}_t_mpl")
-                t_materi = st.text_input("Nama Materi", key=f"{key_prefix}_t_mat")
+                t_mapel = st.selectbox("Mata Pelajaran", LIST_MAPEL, key=f"{key_prefix}_t_mpl")
+                t_materi = st.text_input("Nama Materi / Bab", key=f"{key_prefix}_t_mat")
             with c_ts2:
                 t_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_t_kat")
                 t_tipe = st.selectbox("Tipe Soal", ["Pilihan Ganda"], key=f"{key_prefix}_t_tip")
@@ -224,7 +266,7 @@ def render_bank_soal_manager(key_prefix):
             current_data = df_bs_edit.iloc[row_idx]
             with st.form(f"form_edit_soal_{key_prefix}"):
                 e_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], index=0, key=f"{key_prefix}_e_kls")
-                e_mapel = st.text_input("Mata Pelajaran", value=str(current_data.get('Mapel', '')), key=f"{key_prefix}_e_mpl")
+                e_mapel = st.selectbox("Mata Pelajaran", LIST_MAPEL, key=f"{key_prefix}_e_mpl")
                 e_materi = st.text_input("Nama Materi", value=str(current_data.get('Nama_Materi', '')), key=f"{key_prefix}_e_mat")
                 e_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_e_kat")
                 e_teks = st.text_area("Teks Pertanyaan", value=str(current_data.get('Teks_Soal', '')), key=f"{key_prefix}_e_teks")
@@ -249,7 +291,7 @@ def render_bank_soal_manager(key_prefix):
     st.dataframe(df_bs, use_container_width=True)
 
 def render_rekap_nilai_panel(key_prefix):
-    st.markdown("### 📊 Rekapitulasi Nilai Siswa")
+    st.markdown("### 📊 Rekapitulasi Nilai Siswa (Berdasarkan Kategori Ujian)")
     df_nilai = read_sheet("Nilai")
     
     if not df_nilai.empty and 'Mapel' in df_nilai.columns:
@@ -272,11 +314,10 @@ def render_rekap_nilai_panel(key_prefix):
         st.markdown("---")
         st.dataframe(df_filtered, use_container_width=True)
         
-        # Tombol Download Rekap
         csv_rekap = df_filtered.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rekap Nilai (.CSV)", data=csv_rekap, file_name="rekap_nilai_cbt.csv", mime="text/csv", key=f"{key_prefix}_dl_rekap")
     else:
-        st.info("Belum ada data nilai ujian yang masuk ke database (Pastikan tab 'Nilai' sudah dibuat di Google Sheets).")
+        st.info("Belum ada data nilai ujian yang masuk ke database (Pastikan tab 'Nilai' dengan kolom: No_Peserta, Nama_Siswa, Kelas, Mapel, Nama_Materi, Kategori_Ujian, Total_Soal, Jawaban_Benar, Nilai, Tanggal sudah dibuat di Google Sheets).")
 
 # ==========================================
 # A. PORTAL SISWA
@@ -366,7 +407,7 @@ if portal == "Portal Siswa":
             with c_info:
                 st.markdown(f"""
                     <div style='padding: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;'>
-                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 10px;'><b>Nama:</b> {siswa.get('nama', '')}</h4>
+                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 10px;'><b>Nama:</b> {siswa.get('nama', '').upper()}</h4>
                         <p style='margin: 5px 0; font-size: 1.05rem;'><b>Kelas:</b> {siswa.get('kelas', '')} - Rombel {siswa.get('rombel', '')}</p>
                         <p style='margin: 5px 0; font-size: 1.05rem;'><b>Nomor Peserta:</b> {siswa.get('no_peserta', '')}</p>
                     </div>
@@ -424,7 +465,7 @@ if portal == "Portal Siswa":
         else:
             st.markdown(f"""
                 <div class='profil-box'>
-                    <span style='font-size: 1.1rem; color: #0d5c3b; font-weight: bold;'>👤 {siswa.get('nama')}</span> | 
+                    <span style='font-size: 1.1rem; color: #0d5c3b; font-weight: bold;'>👤 {str(siswa.get('nama', '')).upper()}</span> | 
                     <span><b>Kelas:</b> {siswa.get('kelas')} ({siswa.get('rombel')})</span> | 
                     <span><b>No:</b> {siswa.get('no_peserta')}</span> | 
                     <span style='color: #1e3a8a;'><b>Ujian:</b> {st.session_state.mapel_ujian} - {st.session_state.materi_ujian} ({st.session_state.kategori_ujian})</span>
@@ -491,7 +532,6 @@ if portal == "Portal Siswa":
 
                     st.markdown("<hr>", unsafe_allow_html=True)
                     if st.button("✅ Selesai & Kirim Ujian", type="primary", use_container_width=True):
-                        # Hitung Nilai Otomatis
                         benar = 0
                         for idx, s_row in soal_aktif.iterrows():
                             ans = st.session_state.jawaban_siswa.get(idx, "")
@@ -504,10 +544,9 @@ if portal == "Portal Siswa":
                         nilai_akhir = round((benar / total_soal) * 100, 2) if total_soal > 0 else 0
                         tgl_sekarang = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-                        # Simpan ke Sheet Nilai
                         row_nilai = [
                             str(siswa.get('no_peserta', '')),
-                            str(siswa.get('nama', '')),
+                            str(siswa.get('nama', '')).upper(),
                             str(siswa.get('kelas', '')),
                             str(st.session_state.mapel_ujian),
                             str(st.session_state.materi_ujian),
@@ -647,7 +686,7 @@ elif portal == "Ruang Guru Kelas":
                             <hr style='margin: 5px 0;'>
                             <table style='width: 100%; font-size: 0.9rem;'>
                                 <tr><td><b>No Peserta</b></td><td>: {s.get('no_peserta', '')}</td></tr>
-                                <tr><td><b>Nama Siswa</b></td><td>: {s.get('nama', '')}</td></tr>
+                                <tr><td><b>Nama Siswa</b></td><td>: {str(s.get('nama', '')).upper()}</td></tr>
                                 <tr><td><b>Kelas / Rombel</b></td><td>: {s.get('kelas', '')} - {s.get('rombel', '')}</td></tr>
                                 <tr><td><b>Password</b></td><td>: <code>{s.get('password', '')}</code></td></tr>
                             </table>
@@ -690,8 +729,9 @@ elif portal == "Ruang Admin Master":
             
         ta1, ta2, ta3, ta4, ta5, ta6 = st.tabs(["Database Siswa", "Database Guru", "Kelola Bank Soal", "Pelaksanaan Ujian", "Cetak Kartu Ujian", "Rekap Nilai Master"])
         with ta1:
-            st.markdown("### Database Siswa Terdaftar")
-            st.dataframe(read_sheet("Siswa"), use_container_width=True)
+            st.markdown("### Database Siswa Terdaftar (Otomatis Huruf Kapital)")
+            df_sis_db = read_sheet("Siswa")
+            st.dataframe(df_sis_db, use_container_width=True)
             st.markdown("---")
             st.markdown("#### Tambah Siswa Baru")
             with st.form("form_add_s"):
@@ -790,7 +830,7 @@ elif portal == "Ruang Admin Master":
                             <hr style='margin: 5px 0;'>
                             <table style='width: 100%; font-size: 0.9rem;'>
                                 <tr><td><b>No Peserta</b></td><td>: {s.get('no_peserta', '')}</td></tr>
-                                <tr><td><b>Nama Siswa</b></td><td>: {s.get('nama', '')}</td></tr>
+                                <tr><td><b>Nama Siswa</b></td><td>: {str(s.get('nama', '')).upper()}</td></tr>
                                 <tr><td><b>Kelas / Rombel</b></td><td>: {s.get('kelas', '')} - {s.get('rombel', '')}</td></tr>
                                 <tr><td><b>Password</b></td><td>: <code>{s.get('password', '')}</code></td></tr>
                             </table>
