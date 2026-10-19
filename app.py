@@ -6,7 +6,7 @@ from datetime import datetime
 import textwrap
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & TEMA (Pearl Silver & Hijau Emerald)
+# 1. KONFIGURASI HALAMAN & TEMA
 # ==========================================
 st.set_page_config(
     page_title="CBT MI Ashsholahiyah Cilamaya",
@@ -30,12 +30,22 @@ st.markdown("""
         font-size: 1rem;
         margin-bottom: 15px;
     }
-    .card-box {
-        background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
-        border: 1px solid #bbf7d0;
-        border-radius: 12px;
+    .soal-teks {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        line-height: 1.5;
         padding: 20px;
+        background: #fafaf9;
+        border: 1px solid #e7e5e4;
+        border-radius: 10px;
         margin-bottom: 15px;
+        color: #1e293b;
+    }
+    /* Memperbesar ukuran teks pilihan ganda pada radio button */
+    .stRadio label p {
+        font-size: 1.15rem !important;
+        font-weight: 500 !important;
+        color: #0f172a !important;
     }
     .kartu-container {
         border: 2px solid #1e293b;
@@ -164,10 +174,6 @@ with col_h3:
         st.success("🟢 Google Sheets Terhubung")
     else:
         st.error("🔴 Terputus")
-
-if not db_connected and db_error_msg:
-    with st.expander("🔍 Detail Kendala Koneksi Database"):
-        st.code(db_error_msg)
 
 st.markdown("---")
 
@@ -317,7 +323,7 @@ def render_rekap_nilai_panel(key_prefix):
         csv_rekap = df_filtered.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rekap Nilai (.CSV)", data=csv_rekap, file_name="rekap_nilai_cbt.csv", mime="text/csv", key=f"{key_prefix}_dl_rekap")
     else:
-        st.info("Belum ada data nilai ujian yang masuk ke database (Pastikan tab 'Nilai' dengan kolom: No_Peserta, Nama_Siswa, Kelas, Mapel, Nama_Materi, Kategori_Ujian, Total_Soal, Jawaban_Benar, Nilai, Tanggal sudah dibuat di Google Sheets).")
+        st.info("Belum ada data nilai ujian yang masuk ke database.")
 
 # ==========================================
 # A. PORTAL SISWA
@@ -407,7 +413,7 @@ if portal == "Portal Siswa":
             with c_info:
                 st.markdown(f"""
                     <div style='padding: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;'>
-                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 10px;'><b>Nama:</b> {siswa.get('nama', '').upper()}</h4>
+                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 10px;'><b>Nama:</b> {str(siswa.get('nama', '')).upper()}</h4>
                         <p style='margin: 5px 0; font-size: 1.05rem;'><b>Kelas:</b> {siswa.get('kelas', '')} - Rombel {siswa.get('rombel', '')}</p>
                         <p style='margin: 5px 0; font-size: 1.05rem;'><b>Nomor Peserta:</b> {siswa.get('no_peserta', '')}</p>
                     </div>
@@ -501,7 +507,8 @@ if portal == "Portal Siswa":
                     row_soal = soal_aktif.iloc[curr_page]
 
                     st.markdown(f"#### 📄 Soal No. {curr_page + 1} dari {total_soal}")
-                    st.markdown(f"<div style='font-size: 1.1rem; padding: 15px; background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 8px; margin-bottom: 15px;'>{row_soal.get('Teks_Soal', '')}</div>", unsafe_allow_html=True)
+                    # Menampilkan teks soal dengan ukuran font yang diperbesar
+                    st.markdown(f"<div class='soal-teks'>{row_soal.get('Teks_Soal', '')}</div>", unsafe_allow_html=True)
 
                     opsi_pilihan = [
                         f"A. {row_soal.get('Opsi_A', '')}",
