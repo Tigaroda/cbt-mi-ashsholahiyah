@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import textwrap
+import io
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & TEMA
@@ -41,7 +42,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (ULTIMATE CLEANER)
+# 2. KONEKSI GOOGLE SHEETS API (AUTOMATIC JWT/PEM FIX)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -53,18 +54,12 @@ def init_gsheets():
     
     if "private_key" in creds_dict:
         pk = str(creds_dict["private_key"])
-        # Membersihkan karakter escape ganda dari TOML
         pk = pk.replace("\\n", "\n")
-        
-        # Ekstraksi otomatis bagian inti kunci RSA agar dijamin valid oleh Google
         if "BEGIN PRIVATE KEY" in pk and "END PRIVATE KEY" in pk:
             key_body = pk.split("-----BEGIN PRIVATE KEY-----")[1].split("-----END PRIVATE KEY-----")[0]
-            # Hapus spasi atau karakter sampah yang ikut tersalin
             key_body = "".join(key_body.split())
-            # Format ulang baris per 64 karakter standar PEM
             formatted_body = "\n".join(textwrap.wrap(key_body, 64))
             pk = f"-----BEGIN PRIVATE KEY-----\n{formatted_body}\n-----END PRIVATE KEY-----"
-            
         creds_dict["private_key"] = pk
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
@@ -98,6 +93,19 @@ def write_sheet(worksheet_name, row_data):
         try:
             ws = sh.worksheet(worksheet_name)
             ws.append_row(row_data)
+            st.cache_data.clear()
+            return True
+        except Exception:
+            return False
+    return False
+
+def append_bulk_sheet(worksheet_name, df_to_append):
+    if db_connected and sh is not None:
+        try:
+            ws = sh.worksheet(worksheet_name)
+            # Mengubah dataframe menjadi list of lists untuk append_rows
+            values = df_to_append.values.tolist()
+            ws.append_rows(values)
             st.cache_data.clear()
             return True
         except Exception:
@@ -212,7 +220,7 @@ if portal == "Portal Siswa":
                 st.toast("Jawaban Tersimpan!")
                 
         st.markdown("---")
-        if st.button("Selesai & Kirim Jawaban Ujian"):
+        if st.button("Selesai & Kirim Jira Ujian"):
             st.balloons()
             st.success("Jawaban Ujian Berhasil Dikirim!")
 
@@ -330,6 +338,43 @@ elif portal == "Ruang Admin Master":
                             st.rerun()
                             
         with ta3:
-            st.markdown("### Bank Soal (14 Mapel Kurikulum Merdeka)")
+            st.markdown("### 📚 Kelola Bank Soal (14 Mapel Kurikulum Merdeka)")
             st.caption("Mapel: Akidah Akhlak, Al-Qur'an Hadits, Fikih, SKI, Pancasila, Bahasa Indonesia, IPAS, Matematika, PJOK, SBdP, Bahasa Arab, Bahasa Sunda, Bahasa Inggris, KKA.")
+            
+            st.markdown("---")
+            col_d1, col_d2 = st.columns(2)
+            
+            # Template Download CSV
+            with col_d1:
+                st.markdown("#### 📥 Download Template Bank Soal")
+                template_df = pd.DataFrame(columns=["mapel", "kelas", "no_soal", "pertanyaan", "pilihan_a", "pilihan_b", "pilihan_c", "pilihan_d", "kunci_jawaban"])
+                csv_data = template_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Unduh Template CSV Soal",
+                    data=csv_data,
+                    file_name="template_bank_soal.csv",
+                    mime="text/csv",
+                    type="secondary"
+                )
+            
+            # Upload CSV Bank Soal
+            with col_d2:
+                st.markdown("#### 📤 Upload Soal Massal (.CSV)")
+                uploaded_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"])
+                if uploaded_file is not None:
+                    try:
+                        df_upload = pd.read_csv(uploaded_file)
+                        st.write("Pratinjau Data yang Akan Diupload:")
+                        st.dataframe(df_upload.head(3))
+                        if st.button("Proses Upload ke Google Sheets", type="primary"):
+                            if append_bulk_sheet("BankSoal", df_upload):
+                                st.success("Bank soal berhasil diupload ke Google Sheets!")
+                                st.rerun()
+                            else:
+                                st.error("Gagal mengupload soal ke database.")
+                    except Exception as e:
+                        st.error(f"Format file CSV tidak valid: {e}")
+
+            st.markdown("---")
+            st.markdown("#### 📋 Data Bank Soal di Database Saat Ini")
             st.dataframe(read_sheet("BankSoal"), use_container_width=True)
