@@ -40,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (PEM AUTO-FIX)
+# 2. KONEKSI GOOGLE SHEETS API (AUTOMATIC JWT/PEM FIX)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -51,7 +51,7 @@ def init_gsheets():
     creds_dict = dict(st.secrets["gsheets"])
     if "private_key" in creds_dict:
         pk = str(creds_dict["private_key"])
-        # Mengubah literal '\n' menjadi karakter newline asli
+        # Membersihkan format string agar newline terbaca sempurna
         pk = pk.replace("\\n", "\n")
         creds_dict["private_key"] = pk
     
