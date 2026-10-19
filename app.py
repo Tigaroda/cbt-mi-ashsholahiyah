@@ -248,8 +248,38 @@ def render_bank_soal_manager(key_prefix):
     df_bs = read_sheet("BankSoal")
     st.dataframe(df_bs, use_container_width=True)
 
+def render_rekap_nilai_panel(key_prefix):
+    st.markdown("### 📊 Rekapitulasi Nilai Siswa")
+    df_nilai = read_sheet("Nilai")
+    
+    if not df_nilai.empty and 'Mapel' in df_nilai.columns:
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            f_mapel = st.selectbox("Filter Mapel", ["Semua"] + df_nilai['Mapel'].dropna().unique().tolist(), key=f"{key_prefix}_f_mpl")
+        with col_f2:
+            f_kat = st.selectbox("Filter Kategori Ujian", ["Semua", "Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_f_kat")
+        with col_f3:
+            f_kls = st.selectbox("Filter Kelas", ["Semua"] + df_nilai['Kelas'].dropna().unique().tolist(), key=f"{key_prefix}_f_kls")
+            
+        df_filtered = df_nilai.copy()
+        if f_mapel != "Semua":
+            df_filtered = df_filtered[df_filtered['Mapel'] == f_mapel]
+        if f_kat != "Semua":
+            df_filtered = df_filtered[df_filtered['Kategori_Ujian'] == f_kat]
+        if f_kls != "Semua":
+            df_filtered = df_filtered[df_filtered['Kelas'] == f_kls]
+            
+        st.markdown("---")
+        st.dataframe(df_filtered, use_container_width=True)
+        
+        # Tombol Download Rekap
+        csv_rekap = df_filtered.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Rekap Nilai (.CSV)", data=csv_rekap, file_name="rekap_nilai_cbt.csv", mime="text/csv", key=f"{key_prefix}_dl_rekap")
+    else:
+        st.info("Belum ada data nilai ujian yang masuk ke database (Pastikan tab 'Nilai' sudah dibuat di Google Sheets).")
+
 # ==========================================
-# A. PORTAL SISWA (SESUAI SKETSA BUKU)
+# A. PORTAL SISWA
 # ==========================================
 if portal == "Portal Siswa":
     if st.session_state.user_siswa is None:
@@ -313,11 +343,9 @@ if portal == "Portal Siswa":
     else:
         siswa = st.session_state.user_siswa
 
-        # Jika belum klik mulai mengerjakan (Tampilan Dashboard Sesuai Sketsa Buku Halaman 2)
         if not st.session_state.sedang_ujian:
             st.markdown("### 🪪 Kartu Identitas Peserta Ujian")
             
-            # Layout Kotak Profil (Foto di Kiri, Identitas di Kanan) sesuai sketsa
             c_foto, c_info = st.columns([1, 3])
             with c_foto:
                 st.markdown("""
@@ -376,8 +404,16 @@ if portal == "Portal Siswa":
                     st.warning("Belum ada data Bank Soal yang tersedia.")
 
             with col_menu2:
-                st.markdown("#### 📊 Riwayat Nilai")
-                st.info("Belum ada riwayat nilai ujian tersimpan.")
+                st.markdown("#### 📊 Riwayat Nilai Saya")
+                df_nilai_s = read_sheet("Nilai")
+                if not df_nilai_s.empty and 'No_Peserta' in df_nilai_s.columns:
+                    my_nilai = df_nilai_s[df_nilai_s['No_Peserta'].astype(str) == str(siswa.get('no_peserta', ''))]
+                    if not my_nilai.empty:
+                        st.dataframe(my_nilai[['Mapel', 'Nama_Materi', 'Kategori_Ujian', 'Nilai', 'Tanggal']], use_container_width=True)
+                    else:
+                        st.info("Belum ada riwayat ujian yang diselesaikan.")
+                else:
+                    st.info("Belum ada data nilai.")
 
             st.markdown("---")
             if st.button("🚪 Keluar / Logout", type="secondary"):
@@ -385,9 +421,7 @@ if portal == "Portal Siswa":
                 st.session_state.sedang_ujian = False
                 st.rerun()
 
-        # Jika SEDANG UJIAN (Tampilan Lembar Soal di Kiri, Peta Butir Soal di Kanan Sesuai Sketsa Buku Halaman 1)
         else:
-            # Header Identitas Ringkas di Atas Ujian
             st.markdown(f"""
                 <div class='profil-box'>
                     <span style='font-size: 1.1rem; color: #0d5c3b; font-weight: bold;'>👤 {siswa.get('nama')}</span> | 
@@ -406,7 +440,6 @@ if portal == "Portal Siswa":
             ].reset_index(drop=True)
 
             if soal_aktif.empty:
-                # Fallback jika filter kelas ketat kosong
                 soal_aktif = df_bank[
                     (df_bank['Mapel'] == st.session_state.mapel_ujian) & 
                     (df_bank['Nama_Materi'] == st.session_state.materi_ujian) & 
@@ -420,7 +453,6 @@ if portal == "Portal Siswa":
                 if "jawaban_siswa" not in st.session_state:
                     st.session_state.jawaban_siswa = {}
 
-                # Layout Dua Kolom (Kiri: Lembar Soal, Kanan: Peta Butir Soal Sesuai Sketsa)
                 col_soal_kiri, col_peta_kanan = st.columns([3, 1])
 
                 with col_soal_kiri:
@@ -437,7 +469,6 @@ if portal == "Portal Siswa":
                         f"D. {row_soal.get('Opsi_D', '')}"
                     ]
 
-                    # Tentukan index pilihan sebelumnya jika ada
                     ans_key = f"ans_soal_{curr_page}"
                     val_terpilih = st.radio("Pilih Opsi Jawaban:", opsi_pilihan, key=ans_key, index=0)
 
@@ -446,7 +477,6 @@ if portal == "Portal Siswa":
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # Tombol Navigasi Panah Kiri (Sebelumnya) dan Kanan (Selanjutnya) Sesuai Sketsa
                     c_btn_l, c_btn_r = st.columns(2)
                     with c_btn_l:
                         if curr_page > 0:
@@ -461,8 +491,36 @@ if portal == "Portal Siswa":
 
                     st.markdown("<hr>", unsafe_allow_html=True)
                     if st.button("✅ Selesai & Kirim Ujian", type="primary", use_container_width=True):
+                        # Hitung Nilai Otomatis
+                        benar = 0
+                        for idx, s_row in soal_aktif.iterrows():
+                            ans = st.session_state.jawaban_siswa.get(idx, "")
+                            if ans:
+                                huruf_pilih = ans.split(".")[0].strip().upper()
+                                kunci_asli = str(s_row.get('Kunci', '')).strip().upper()
+                                if huruf_pilih == kunci_asli:
+                                    benar += 1
+                        
+                        nilai_akhir = round((benar / total_soal) * 100, 2) if total_soal > 0 else 0
+                        tgl_sekarang = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+                        # Simpan ke Sheet Nilai
+                        row_nilai = [
+                            str(siswa.get('no_peserta', '')),
+                            str(siswa.get('nama', '')),
+                            str(siswa.get('kelas', '')),
+                            str(st.session_state.mapel_ujian),
+                            str(st.session_state.materi_ujian),
+                            str(st.session_state.kategori_ujian),
+                            int(total_soal),
+                            int(benar),
+                            float(nilai_akhir),
+                            str(tgl_sekarang)
+                        ]
+                        write_sheet("Nilai", row_nilai)
+
                         st.balloons()
-                        st.success("Jawaban Ujian Berhasil Dikirim!")
+                        st.success(f"Ujian Selesai! Perolehan Nilai Anda: {nilai_akhir} (Benar {benar} dari {total_soal} soal)")
                         st.session_state.sedang_ujian = False
                         st.rerun()
 
@@ -470,13 +528,11 @@ if portal == "Portal Siswa":
                     st.markdown("#### 🗺️ Butir Soal")
                     st.caption("Biru: Terisi | Kuning: Belum")
                     
-                    # Grid Peta Butir Soal (4 kolom ke samping)
                     peta_cols = st.columns(4)
                     for idx in range(total_soal):
                         c_idx = idx % 4
                         with peta_cols[c_idx]:
                             status_jawab = st.session_state.jawaban_siswa.get(idx)
-                            # Warna tombol: Primary (Biru) jika terisi, Secondary (Kuning/Abu) jika belum
                             btn_type = "primary" if status_jawab else "secondary"
                             if st.button(f"{idx+1}", key=f"grid_peta_{idx}", type=btn_type, use_container_width=True):
                                 st.session_state.q_page = idx
@@ -522,7 +578,7 @@ elif portal == "Ruang Guru Kelas":
             st.session_state.user_guru = None
             st.rerun()
             
-        t1, t2, t3, t4 = st.tabs(["Kelola Bank Soal", "Pelaksanaan Ujian", "Cetak Kartu Ujian", "Rekap Nilai"])
+        t1, t2, t3, t4, t5 = st.tabs(["Kelola Bank Soal", "Pelaksanaan Ujian", "Cetak Kartu Ujian", "Rekap Nilai", "Monitoring Nilai Siswa"])
         with t1:
             render_bank_soal_manager("guru")
         with t2:
@@ -601,8 +657,14 @@ elif portal == "Ruang Guru Kelas":
             else:
                 st.warning("Belum ada data siswa di database.")
         with t4:
-            st.markdown("### Rekapitulasi Nilai Ujian")
-            st.info("Belum ada data nilai ujian yang masuk.")
+            render_rekap_nilai_panel("guru")
+        with t5:
+            st.markdown("### 📈 Monitoring Hasil Pengerjaan Siswa")
+            df_n_mon = read_sheet("Nilai")
+            if not df_n_mon.empty:
+                st.dataframe(df_n_mon, use_container_width=True)
+            else:
+                st.info("Belum ada siswa yang menyelesaikan ujian.")
 
 # ==========================================
 # C. RUANG ADMIN MASTER
@@ -626,7 +688,7 @@ elif portal == "Ruang Admin Master":
             st.session_state.user_admin = False
             st.rerun()
             
-        ta1, ta2, ta3, ta4, ta5 = st.tabs(["Database Siswa", "Database Guru", "Kelola Bank Soal", "Pelaksanaan Ujian", "Cetak Kartu Ujian"])
+        ta1, ta2, ta3, ta4, ta5, ta6 = st.tabs(["Database Siswa", "Database Guru", "Kelola Bank Soal", "Pelaksanaan Ujian", "Cetak Kartu Ujian", "Rekap Nilai Master"])
         with ta1:
             st.markdown("### Database Siswa Terdaftar")
             st.dataframe(read_sheet("Siswa"), use_container_width=True)
@@ -737,3 +799,5 @@ elif portal == "Ruang Admin Master":
                         """, unsafe_allow_html=True)
             else:
                 st.warning("Belum ada data siswa.")
+        with ta6:
+            render_rekap_nilai_panel("admin")
