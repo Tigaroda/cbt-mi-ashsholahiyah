@@ -40,7 +40,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (AUTOMATIC JWT/PEM FIX)
+# ==========================================
+# 2. KONEKSI GOOGLE SHEETS API (FINAL ULTRA FIX)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -49,11 +50,15 @@ def init_gsheets():
         "https://www.googleapis.com/auth/drive"
     ]
     creds_dict = dict(st.secrets["gsheets"])
+    
     if "private_key" in creds_dict:
         pk = str(creds_dict["private_key"])
-        # Membersihkan format string agar newline terbaca sempurna
+        # Membersihkan dan memastikan format PEM dan baris baru terbaca sempurna
         pk = pk.replace("\\n", "\n")
-        creds_dict["private_key"] = pk
+        if "-----BEGIN PRIVATE KEY-----" in pk and not pk.startswith("-----BEGIN PRIVATE KEY-----"):
+            # Memperbaiki jika terpotong bagian depannya
+            pk = "-----BEGIN PRIVATE KEY-----\n" + pk.split("-----BEGIN PRIVATE KEY-----")[-1]
+        creds_dict["private_key"] = pk.strip()
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
