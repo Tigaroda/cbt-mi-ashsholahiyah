@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import textwrap
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & TEMA
@@ -40,8 +41,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (FINAL ULTRA FIX)
+# 2. KONEKSI GOOGLE SHEETS API (ULTIMATE CLEANER)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -53,12 +53,19 @@ def init_gsheets():
     
     if "private_key" in creds_dict:
         pk = str(creds_dict["private_key"])
-        # Membersihkan dan memastikan format PEM dan baris baru terbaca sempurna
+        # Membersihkan karakter escape ganda dari TOML
         pk = pk.replace("\\n", "\n")
-        if "-----BEGIN PRIVATE KEY-----" in pk and not pk.startswith("-----BEGIN PRIVATE KEY-----"):
-            # Memperbaiki jika terpotong bagian depannya
-            pk = "-----BEGIN PRIVATE KEY-----\n" + pk.split("-----BEGIN PRIVATE KEY-----")[-1]
-        creds_dict["private_key"] = pk.strip()
+        
+        # Ekstraksi otomatis bagian inti kunci RSA agar dijamin valid oleh Google
+        if "BEGIN PRIVATE KEY" in pk and "END PRIVATE KEY" in pk:
+            key_body = pk.split("-----BEGIN PRIVATE KEY-----")[1].split("-----END PRIVATE KEY-----")[0]
+            # Hapus spasi atau karakter sampah yang ikut tersalin
+            key_body = "".join(key_body.split())
+            # Format ulang baris per 64 karakter standar PEM
+            formatted_body = "\n".join(textwrap.wrap(key_body, 64))
+            pk = f"-----BEGIN PRIVATE KEY-----\n{formatted_body}\n-----END PRIVATE KEY-----"
+            
+        creds_dict["private_key"] = pk
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
