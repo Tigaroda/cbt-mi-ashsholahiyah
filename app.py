@@ -14,7 +14,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling (Emerald Islami & Aurora)
 st.markdown("""
     <style>
     .main-header {
@@ -41,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. KONEKSI GOOGLE SHEETS API (FIX JWT)
+# 2. KONEKSI GOOGLE SHEETS API (ROBUST PEM FIX)
 # ==========================================
 @st.cache_resource(ttl=60)
 def init_gsheets():
@@ -50,14 +49,18 @@ def init_gsheets():
         "https://www.googleapis.com/auth/drive"
     ]
     creds_dict = dict(st.secrets["gsheets"])
-    # Membersihkan format private key dari escape character
     if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        pk = creds_dict["private_key"]
+        pk = pk.replace("\\n", "\n")
+        if not pk.startswith("-----BEGIN PRIVATE KEY-----"):
+            pk = "-----BEGIN PRIVATE KEY-----\n" + pk
+        if not pk.endswith("-----END PRIVATE KEY-----"):
+            pk = pk + "\n-----END PRIVATE KEY-----"
+        creds_dict["private_key"] = pk
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
-# Inisialisasi Database
 db_connected = False
 db_error_msg = ""
 sh = None
@@ -71,7 +74,6 @@ except Exception as e:
     db_connected = False
     db_error_msg = str(e)
 
-# Fungsi Helper Baca & Tulis Data
 def read_sheet(worksheet_name):
     if not db_connected or sh is None:
         return pd.DataFrame()
@@ -79,7 +81,7 @@ def read_sheet(worksheet_name):
         ws = sh.worksheet(worksheet_name)
         data = ws.get_all_records()
         return pd.DataFrame(data)
-    except Exception as err:
+    except Exception:
         return pd.DataFrame()
 
 def write_sheet(worksheet_name, row_data):
@@ -102,8 +104,6 @@ if "user_guru" not in st.session_state:
     st.session_state.user_guru = None
 if "user_admin" not in st.session_state:
     st.session_state.user_admin = False
-if "jawaban" not in st.session_state:
-    st.session_state.jawaban = {}
 
 # ==========================================
 # 4. HEADER UTAMA & STATUS KONEKSI
@@ -152,9 +152,7 @@ if portal == "Portal Siswa":
                 no_peserta = st.text_input("Nomor Peserta Ujian")
                 pass_siswa = st.text_input("Password / Sandi", type="password")
             
-            btn_masuk_siswa = st.form_submit_button("Masuk Kelas Ujian", type="primary")
-            
-            if btn_masuk_siswa:
+            if st.form_submit_button("Masuk Kelas Ujian", type="primary"):
                 df_siswa = read_sheet("Siswa")
                 if not df_siswa.empty:
                     cek = df_siswa[
@@ -168,7 +166,6 @@ if portal == "Portal Siswa":
                     else:
                         st.error("Nomor Peserta atau Password tidak ditemukan!")
                 else:
-                    # Alternatif masuk awal untuk pengujian
                     if no_peserta == "123" and pass_siswa == "123":
                         st.session_state.user_siswa = {"nama": "SISWA PERCOBAAN", "kelas": pilih_kelas, "rombel": pilih_rombel, "no_peserta": "123"}
                         st.rerun()
@@ -185,12 +182,10 @@ if portal == "Portal Siswa":
             
         st.markdown("---")
         st.subheader("📝 Lembar Ujian: Koding & Kecerdasan Artifisial (KKA)")
-        
-        # Engine Ujian 1 Soal Per Layar (Simulasi)
         st.markdown("#### Soal No. 1 (Pilihan Ganda)")
         st.write("Apa fungsi utama dari perintah program / logika instruksi pada komputer?")
         
-        opsi = st.radio(
+        st.radio(
             "Pilih Jawaban Anda:",
             ["A. Memberikan urutan langkah kerja otomatis kepada komputer",
              "B. Membersihkan layar komputer secara fisik",
@@ -198,7 +193,6 @@ if portal == "Portal Siswa":
              "D. Menghapus file secara permanen"],
             key="soal1"
         )
-        st.session_state.jawaban["soal1"] = opsi
         st.caption("🔒 *Auto-Save Aktif: Jawaban tersimpan otomatis.*")
         
         col_b1, col_b2 = st.columns([1,1])
@@ -224,9 +218,8 @@ elif portal == "Ruang Guru Kelas":
         with st.form("form_login_guru"):
             u_guru = st.text_input("Nama Guru / ID")
             p_guru = st.text_input("Password Guru", type="password")
-            btn_guru = st.form_submit_button("Masuk Ruang Guru")
             
-            if btn_guru:
+            if st.form_submit_button("Masuk Ruang Guru"):
                 if not df_guru.empty:
                     cek_g = df_guru[
                         (df_guru['nama_guru'].astype(str).str.lower() == u_guru.strip().lower()) &
@@ -252,18 +245,14 @@ elif portal == "Ruang Guru Kelas":
             st.session_state.user_guru = None
             st.rerun()
             
-        t1, t2, t3 = st.tabs(["Data Siswa Kelas Saya", "Bank Soal", "Rekap Nilai Ujian"])
+        t1, t2, t3 = st.tabs(["Data Siswa Kelas", "Bank Soal", "Rekap Nilai Ujian"])
         
         with t1:
             st.markdown("### Daftar Siswa Terdaftar")
-            df_siswa_all = read_sheet("Siswa")
-            st.dataframe(df_siswa_all, use_container_width=True)
-            
+            st.dataframe(read_sheet("Siswa"), use_container_width=True)
         with t2:
             st.markdown("### Bank Soal")
-            df_soal = read_sheet("BankSoal")
-            st.dataframe(df_soal, use_container_width=True)
-            
+            st.dataframe(read_sheet("BankSoal"), use_container_width=True)
         with t3:
             st.markdown("### Hasil & Rekapitulasi Ujian")
             st.info("Belum ada ujian aktif yang diselesaikan hari ini.")
@@ -277,9 +266,8 @@ elif portal == "Ruang Admin Master":
         with st.form("form_login_admin"):
             u_admin = st.text_input("Username Admin")
             p_admin = st.text_input("Password Admin", type="password")
-            btn_admin = st.form_submit_button("Masuk Admin Master", type="primary")
             
-            if btn_admin:
+            if st.form_submit_button("Masuk Admin Master", type="primary"):
                 if u_admin == "nasruddinrudi" and p_admin == "nasruddinHoja":
                     st.session_state.user_admin = True
                     st.success("Login Admin Master Berhasil!")
@@ -296,8 +284,7 @@ elif portal == "Ruang Admin Master":
         
         with ta1:
             st.markdown("### Database Siswa Terdaftar")
-            df_s = read_sheet("Siswa")
-            st.dataframe(df_s, use_container_width=True)
+            st.dataframe(read_sheet("Siswa"), use_container_width=True)
             
             st.markdown("---")
             st.markdown("#### Tambah Siswa Baru")
@@ -313,17 +300,13 @@ elif portal == "Ruang Admin Master":
                 
                 if st.form_submit_button("Simpan Siswa ke Google Sheets"):
                     if np_in and nm_in:
-                        res = write_sheet("Siswa", [k_in, r_in, np_in, nm_in.upper(), ps_in, "offline"])
-                        if res:
+                        if write_sheet("Siswa", [k_in, r_in, np_in, nm_in.upper(), ps_in, "offline"]):
                             st.success(f"Siswa {nm_in.upper()} tersimpan di Google Sheets!")
                             st.rerun()
-                        else:
-                            st.error("Gagal menyimpan ke Google Sheets.")
         
         with ta2:
             st.markdown("### Database Guru Kelas")
-            df_g = read_sheet("Guru")
-            st.dataframe(df_g, use_container_width=True)
+            st.dataframe(read_sheet("Guru"), use_container_width=True)
             
             st.markdown("---")
             st.markdown("#### Tambah Guru Baru")
@@ -333,16 +316,14 @@ elif portal == "Ruang Admin Master":
                 pw_in = st.text_input("Password Guru")
                 if st.form_submit_button("Simpan Guru ke Google Sheets"):
                     if ng_in:
-                        res_g = write_sheet("Guru", [ng_in, ka_in, pw_in, "offline"])
-                        if res_g:
+                        if write_sheet("Guru", [ng_in, ka_in, pw_in, "offline"]):
                             st.success(f"Guru {ng_in} tersimpan di Google Sheets!")
                             st.rerun()
                             
         with ta3:
             st.markdown("### Bank Soal (14 Mapel Kurikulum Merdeka)")
             st.caption("Mapel: Akidah Akhlak, Al-Qur'an Hadits, Fikih, SKI, Pancasila, Bahasa Indonesia, IPAS, Matematika, PJOK, SBdP, Bahasa Arab, Bahasa Sunda, Bahasa Inggris, KKA.")
-            df_soal_adm = read_sheet("BankSoal")
-            st.dataframe(df_soal_adm, use_container_width=True)
+            st.dataframe(read_sheet("BankSoal"), use_container_width=True)
             
         with ta4:
             st.markdown("### Keamanan 2FA OTP WhatsApp")
