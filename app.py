@@ -41,7 +41,6 @@ st.markdown("""
         margin-bottom: 15px;
         color: #1e293b;
     }
-    /* Memperbesar ukuran teks pilihan ganda pada radio button */
     .stRadio label p {
         font-size: 1.15rem !important;
         font-weight: 500 !important;
@@ -147,7 +146,7 @@ def append_bulk_sheet(worksheet_name, df_to_append):
     return False, "Database belum terhubung"
 
 # ==========================================
-# 3. SESSION STATE
+# 3. SESSION STATE INISIALISASI
 # ==========================================
 if "user_siswa" not in st.session_state:
     st.session_state.user_siswa = None
@@ -157,6 +156,8 @@ if "user_admin" not in st.session_state:
     st.session_state.user_admin = False
 if "sedang_ujian" not in st.session_state:
     st.session_state.sedang_ujian = False
+if "jawaban_siswa" not in st.session_state:
+    st.session_state.jawaban_siswa = {}
 
 # ==========================================
 # 4. WIDGET REAL-TIME HEADER
@@ -183,6 +184,7 @@ st.markdown("---")
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
 
+# 14 Mata Pelajaran Kurikulum Merdeka Terinclud Penuh
 LIST_MAPEL = [
     "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
     "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
@@ -424,7 +426,7 @@ if portal == "Portal Siswa":
             with col_menu1:
                 st.markdown("#### 📁 Ujian Tersedia")
                 df_bank = read_sheet("BankSoal")
-                if not df_bank.empty and 'Mapel' in df_bank.columns:
+                if not df_bank.empty and 'Mapel' in df_bank.columns and 'Kelas' in df_bank.columns:
                     df_kelas = df_bank[df_bank['Kelas'].astype(str).str.lower() == str(siswa.get('kelas', '')).lower()]
                     if df_kelas.empty:
                         df_kelas = df_bank 
@@ -445,10 +447,11 @@ if portal == "Portal Siswa":
                         st.session_state.materi_ujian = pilih_materi
                         st.session_state.kategori_ujian = pilih_kategori
                         st.session_state.q_page = 0
-                        st.session_state.jawaban_siswa = {}
+                        if "jawaban_siswa" not in st.session_state:
+                            st.session_state.jawaban_siswa = {}
                         st.rerun()
                 else:
-                    st.warning("Belum ada data Bank Soal yang tersedia.")
+                    st.warning("Belum ada data Bank Soal yang tersedia di database.")
 
             with col_menu2:
                 st.markdown("#### 📊 Riwayat Nilai Saya")
@@ -479,19 +482,22 @@ if portal == "Portal Siswa":
             """, unsafe_allow_html=True)
 
             df_bank = read_sheet("BankSoal")
-            soal_aktif = df_bank[
-                (df_bank['Kelas'].astype(str).str.lower() == str(siswa.get('kelas', '')).lower()) &
-                (df_bank['Mapel'] == st.session_state.mapel_ujian) & 
-                (df_bank['Nama_Materi'] == st.session_state.materi_ujian) & 
-                (df_bank['Kategori_Ujian'] == st.session_state.kategori_ujian)
-            ].reset_index(drop=True)
-
-            if soal_aktif.empty:
+            if not df_bank.empty and 'Mapel' in df_bank.columns and 'Kelas' in df_bank.columns:
                 soal_aktif = df_bank[
+                    (df_bank['Kelas'].astype(str).str.lower() == str(siswa.get('kelas', '')).lower()) &
                     (df_bank['Mapel'] == st.session_state.mapel_ujian) & 
                     (df_bank['Nama_Materi'] == st.session_state.materi_ujian) & 
                     (df_bank['Kategori_Ujian'] == st.session_state.kategori_ujian)
                 ].reset_index(drop=True)
+
+                if soal_aktif.empty:
+                    soal_aktif = df_bank[
+                        (df_bank['Mapel'] == st.session_state.mapel_ujian) & 
+                        (df_bank['Nama_Materi'] == st.session_state.materi_ujian) & 
+                        (df_bank['Kategori_Ujian'] == st.session_state.kategori_ujian)
+                    ].reset_index(drop=True)
+            else:
+                soal_aktif = pd.DataFrame()
 
             if not soal_aktif.empty:
                 total_soal = len(soal_aktif)
@@ -507,18 +513,29 @@ if portal == "Portal Siswa":
                     row_soal = soal_aktif.iloc[curr_page]
 
                     st.markdown(f"#### 📄 Soal No. {curr_page + 1} dari {total_soal}")
-                    # Menampilkan teks soal dengan ukuran font yang diperbesar
                     st.markdown(f"<div class='soal-teks'>{row_soal.get('Teks_Soal', '')}</div>", unsafe_allow_html=True)
 
-                    opsi_pilihan = [
-                        f"A. {row_soal.get('Opsi_A', '')}",
-                        f"B. {row_soal.get('Opsi_B', '')}",
-                        f"C. {row_soal.get('Opsi_C', '')}",
-                        f"D. {row_soal.get('Opsi_D', '')}"
+                    # Ambil opsi secara dinamis (hanya opsi yang memiliki teks)
+                    opsi_list_raw = [
+                        ("A", row_soal.get('Opsi_A', '')),
+                        ("B", row_soal.get('Opsi_B', '')),
+                        ("C", row_soal.get('Opsi_C', '')),
+                        ("D", row_soal.get('Opsi_D', ''))
                     ]
+                    opsi_valid = [(huruf, teks) for huruf, teks in opsi_list_raw if str(teks).strip() != ""]
+                    if not opsi_valid:
+                        opsi_valid = [("A", "A"), ("B", "B"), ("C", "C"), ("D", "D")]
+
+                    format_opsi = [f"{huruf}. {teks}" for huruf, teks in opsi_valid]
+
+                    # Sinkronisasi jawaban tersimpan agar tidak hilang saat navigasi/refresh
+                    saved_ans = st.session_state.jawaban_siswa.get(curr_page, "")
+                    default_idx = 0
+                    if saved_ans in format_opsi:
+                        default_idx = format_opsi.index(saved_ans)
 
                     ans_key = f"ans_soal_{curr_page}"
-                    val_terpilih = st.radio("Pilih Opsi Jawaban:", opsi_pilihan, key=ans_key, index=0)
+                    val_terpilih = st.radio("Pilih Opsi Jawaban:", format_opsi, key=ans_key, index=default_idx)
 
                     if val_terpilih:
                         st.session_state.jawaban_siswa[curr_page] = val_terpilih
@@ -568,17 +585,19 @@ if portal == "Portal Siswa":
                         st.balloons()
                         st.success(f"Ujian Selesai! Perolehan Nilai Anda: {nilai_akhir} (Benar {benar} dari {total_soal} soal)")
                         st.session_state.sedang_ujian = False
+                        st.session_state.jawaban_siswa = {}
                         st.rerun()
 
                 with col_peta_kanan:
                     st.markdown("#### 🗺️ Butir Soal")
-                    st.caption("Biru: Terisi | Kuning: Belum")
+                    st.caption("Biru: Terisi | Abu: Belum")
                     
                     peta_cols = st.columns(4)
                     for idx in range(total_soal):
                         c_idx = idx % 4
                         with peta_cols[c_idx]:
                             status_jawab = st.session_state.jawaban_siswa.get(idx)
+                            # Indikator warna tombol dinamis (Primary jika terisi, Secondary jika belum)
                             btn_type = "primary" if status_jawab else "secondary"
                             if st.button(f"{idx+1}", key=f"grid_peta_{idx}", type=btn_type, use_container_width=True):
                                 st.session_state.q_page = idx
@@ -628,7 +647,7 @@ elif portal == "Ruang Guru Kelas":
         with t1:
             render_bank_soal_manager("guru")
         with t2:
-            st.markdown("### 🚀 Atur Pelaksanaan Ujian & Ceklis Pemilihan Soal")
+            st.markdown("### 🚀 Atur Pelaksanaan Ujian (Multi-Sesi dengan Centang/Ceklis)")
             df_b = read_sheet("BankSoal")
             if not df_b.empty and 'Kelas' in df_b.columns and len(df_b) > 0:
                 col_g1, col_g2 = st.columns(2)
@@ -645,7 +664,7 @@ elif portal == "Ruang Guru Kelas":
                     p_stat = st.selectbox("Status Pelaksanaan", ["Dibuka (Live)", "Ditutup"], key="g_stat")
                 
                 st.markdown("---")
-                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Ujian Ini")
+                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Pelaksanaan Ujian Ini (Bisa Banyak Sesi)")
                 soal_filter_g = df_b[(df_b['Kelas'] == p_kls) & (df_b['Mapel'] == p_mapel) & (df_b['Nama_Materi'] == p_mat) & (df_b['Kategori_Ujian'] == p_kat)]
                 if not soal_filter_g.empty:
                     selected_indices = []
@@ -658,8 +677,8 @@ elif portal == "Ruang Guru Kelas":
                     
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
-                        if st.button("Simpan & Siarkan Ujian ke Siswa", type="primary", key="g_siar"):
-                            st.success("Ujian berhasil disiarkan ke portal siswa!")
+                        if st.button("Simpan & Siarkan Pelaksanaan Ujian", type="primary", key="g_siar"):
+                            st.success("Pelaksanaan ujian berhasil disiarkan ke portal siswa!")
                     with col_btn2:
                         if not preview_soal.empty:
                             pdf_text = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {p_mapel} | MATERI: {p_mat} | KATEGORI: {p_kat}\n" + "="*50 + "\n\n"
@@ -772,7 +791,7 @@ elif portal == "Ruang Admin Master":
         with ta3:
             render_bank_soal_manager("admin")
         with ta4:
-            st.markdown("### ⚙️ Kontrol Pelaksanaan Ujian & Ceklis Pemilihan Soal (Master)")
+            st.markdown("### ⚙️ Kontrol Pelaksanaan Ujian (Multi-Sesi & Ceklis)")
             df_b_ad = read_sheet("BankSoal")
             if not df_b_ad.empty and 'Kelas' in df_b_ad.columns and len(df_b_ad) > 0:
                 col_ad1, col_ad2 = st.columns(2)
@@ -789,7 +808,7 @@ elif portal == "Ruang Admin Master":
                     ad_stat = st.selectbox("Status Ujian", ["Dibuka (Live)", "Ditutup"], key="ad_stat")
                 
                 st.markdown("---")
-                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Ujian Ini")
+                st.markdown("#### ☑️ Ceklis Pemilihan Soal untuk Pelaksanaan Ujian Ini")
                 soal_filter_ad = df_b_ad[(df_b_ad['Kelas'] == ad_kls) & (df_b_ad['Mapel'] == ad_mapel) & (df_b_ad['Nama_Materi'] == ad_mat) & (df_b_ad['Kategori_Ujian'] == ad_kat)]
                 if not soal_filter_ad.empty:
                     selected_indices_ad = []
@@ -803,7 +822,7 @@ elif portal == "Ruang Admin Master":
                     c_btn1, c_btn2 = st.columns(2)
                     with c_btn1:
                         if st.button("Terapkan & Siarkan Sesi Ujian", type="primary", key="ad_siar"):
-                            st.success("Sesi ujian berhasil disiarkan!")
+                            st.success("Sesi pelaksanaan ujian berhasil disiarkan!")
                     with c_btn2:
                         if not preview_ad.empty:
                             pdf_txt_ad = f"CBT MI ASHSHOLAHIYAH CILAMAYA\nMAPEL: {ad_mapel} | MATERI: {ad_mat} | KATEGORI: {ad_kat}\n" + "="*50 + "\n\n"
