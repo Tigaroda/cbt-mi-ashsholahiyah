@@ -210,7 +210,6 @@ with st.sidebar.container():
 st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
 
-# 14 Mata Pelajaran Kurikulum Merdeka Lengkap
 LIST_MAPEL = [
     "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
     "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
@@ -228,14 +227,28 @@ BANK_SOAL_COLS = [
 def render_bank_soal_manager(key_prefix):
     st.markdown("### 📚 Kelola Bank Soal (14 Mata Pelajaran & Kategori Lengkap)")
     
-    # Bagian Informasi Statistik Jumlah Soal
+    # Statistik Dinamis Membaca Kolom Tipe_Soal dan Kategori_Ujian dari Spreadsheet
     df_bs_stat = read_sheet("BankSoal")
-    if not df_bs_stat.empty and 'Mapel' in df_bs_stat.columns and 'Kategori_Ujian' in df_bs_stat.columns:
+    if not df_bs_stat.empty:
         tot_soal = len(df_bs_stat)
-        tot_pg = len(df_bs_stat[df_bs_stat['Tipe_Soal'].astype(str).str.contains("Pilihan", case=False, na=False)])
-        tot_uts = len(df_bs_stat[df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Tengah", case=False, na=False)])
-        tot_uas = len(df_bs_stat[df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Semester", case=False, na=False) & ~df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Tengah", case=False, na=False)])
         
+        # Hitung berdasarkan kolom Tipe_Soal atau Kategori jika ada
+        cols_lower = [str(c).lower() for c in df_bs_stat.columns]
+        
+        if 'tipe_soal' in cols_lower:
+            col_tipe = df_bs_stat.columns[cols_lower.index('tipe_soal')]
+            tot_pg = len(df_bs_stat[df_bs_stat[col_tipe].astype(str).str.contains("Pilihan", case=False, na=False)])
+        else:
+            tot_pg = tot_soal
+
+        if 'kategori_ujian' in cols_lower:
+            col_kat = df_bs_stat.columns[cols_lower.index('kategori_ujian')]
+            tot_uts = len(df_bs_stat[df_bs_stat[col_kat].astype(str).str.contains("Tengah", case=False, na=False)])
+            tot_uas = len(df_bs_stat[df_bs_stat[col_kat].astype(str).str.contains("Semester", case=False, na=False) & ~df_bs_stat[col_kat].astype(str).str.contains("Tengah", case=False, na=False)])
+        else:
+            tot_uts = 0
+            tot_uas = 0
+            
         sc1, sc2, sc3, sc4 = st.columns(4)
         with sc1:
             st.markdown(f"<div class='stat-card'><h4>📦 Total Soal</h4><h2>{tot_soal}</h2></div>", unsafe_allow_html=True)
@@ -258,7 +271,7 @@ def render_bank_soal_manager(key_prefix):
             st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv", key=f"{key_prefix}_dl")
         with col_2:
             st.markdown("#### 📤 Upload Soal Massal (.CSV)")
-            up_file = st.file_uploader("Pilih file CSV Bank Soal (Pastikan 14 Mapel & Kategori Sesuai)", type=["csv"], key=f"{key_prefix}_up")
+            up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key=f"{key_prefix}_up")
             if up_file is not None:
                 try:
                     try:
