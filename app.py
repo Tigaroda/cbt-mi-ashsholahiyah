@@ -184,7 +184,7 @@ st.markdown("---")
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
 
-# 14 Mata Pelajaran Kurikulum Merdeka Terinclud Penuh
+# 14 Mata Pelajaran Kurikulum Merdeka Lengkap
 LIST_MAPEL = [
     "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
     "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
