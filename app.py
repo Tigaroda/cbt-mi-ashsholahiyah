@@ -6,7 +6,7 @@ from datetime import datetime
 import textwrap
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & TEMA
+# 1. KONFIGURASI HALAMAN & CSS RESPONSIF LAPTOP
 # ==========================================
 st.set_page_config(
     page_title="CBT MI Ashsholahiyah Cilamaya",
@@ -15,26 +15,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Styling CSS Khusus untuk Optimasi Layar Laptop & Widget Sidebar
 st.markdown("""
     <style>
+    /* Mengurangi margin bawaan container utama agar pas di layar laptop */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        max-width: 100% !important;
+    }
+    
     .main-header {
         text-align: center;
         color: #0d5c3b;
         font-weight: 800;
-        font-size: 2.2rem;
-        margin-bottom: 0px;
+        font-size: 2rem;
+        margin-bottom: 2px;
     }
     .sub-header {
         text-align: center;
         color: #1e3a8a;
-        font-size: 1rem;
+        font-size: 0.95rem;
         margin-bottom: 15px;
     }
     .soal-teks {
-        font-size: 1.25rem !important;
+        font-size: 1.2rem !important;
         font-weight: 600 !important;
         line-height: 1.5;
-        padding: 20px;
+        padding: 18px;
         background: #fafaf9;
         border: 1px solid #e7e5e4;
         border-radius: 10px;
@@ -42,27 +52,36 @@ st.markdown("""
         color: #1e293b;
     }
     .stRadio label p {
-        font-size: 1.15rem !important;
+        font-size: 1.1rem !important;
         font-weight: 500 !important;
         color: #0f172a !important;
     }
     .kartu-container {
         border: 2px solid #1e293b;
         border-radius: 12px;
-        padding: 20px;
+        padding: 15px;
         background: #ffffff;
         width: 100%;
-        max-width: 400px;
+        max-width: 380px;
         margin: 10px auto;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .profil-box {
         background: #ffffff;
         border: 2px solid #cbd5e1;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 20px;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* Style Kartu Widget di Sidebar */
+    .sidebar-widget {
+        background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+        border: 1px solid #bbf7d0;
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 20px;
+        font-size: 0.88rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -160,31 +179,35 @@ if "jawaban_siswa" not in st.session_state:
     st.session_state.jawaban_siswa = {}
 
 # ==========================================
-# 4. WIDGET REAL-TIME HEADER
-# ==========================================
-st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
-
-col_h1, col_h2, col_h3 = st.columns([1.5, 1.5, 1])
-with col_h1:
-    st.markdown(f"📅 **Tanggal:** {datetime.now().strftime('%d %B %Y')}")
-with col_h2:
-    st.markdown(f"⏰ **Waktu:** {datetime.now().strftime('%H:%M:%S')} WIB")
-with col_h3:
-    if db_connected:
-        st.success("🟢 Google Sheets Terhubung")
-    else:
-        st.error("🔴 Terputus")
-
-st.markdown("---")
-
-# ==========================================
-# 5. NAVIGASI UTAMA
+# 4. SIDEBAR MENU & WIDGET REAL-TIME DI BAWAH RUANG ADMIN
 # ==========================================
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
 
-# 14 Mata Pelajaran Kurikulum Merdeka Lengkap
+st.sidebar.markdown("---")
+# Widget Hari, Tanggal, Jam, dan Koneksi diletakkan di paling bawah menu sidebar
+with st.sidebar.container():
+    tgl_str = datetime.now().strftime('%d %B %Y')
+    jam_str = datetime.now().strftime('%H:%M:%S')
+    st.markdown(f"""
+        <div class='sidebar-widget'>
+            <p style='margin: 0; font-weight: bold; color: #0d5c3b;'>🕒 WIDGET SERVER</p>
+            <p style='margin: 4px 0 2px 0;'>📅 <b>Hari/Tgl:</b> {tgl_str}</p>
+            <p style='margin: 2px 0 4px 0;'>⏰ <b>Waktu:</b> {jam_str} WIB</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if db_connected:
+        st.sidebar.success("🟢 Google Sheets Terhubung")
+    else:
+        st.sidebar.error("🔴 Koneksi Terputus")
+
+# ==========================================
+# 5. HEADER UTAMA
+# ==========================================
+st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
+
 LIST_MAPEL = [
     "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
     "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
@@ -336,20 +359,20 @@ if portal == "Portal Siswa":
             <div style='
                 background: linear-gradient(135deg, #0d5c3b 0%, #1e3a8a 100%);
                 padding: 3px;
-                border-radius: 16px;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-                margin-top: 10px;
-                margin-bottom: 20px;
+                border-radius: 14px;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+                margin-top: 5px;
+                margin-bottom: 15px;
             '>
                 <div style='
                     background: #ffffff;
-                    padding: 25px;
-                    border-radius: 14px;
+                    padding: 18px;
+                    border-radius: 12px;
                     text-align: center;
                 '>
-                    <h2 style='color: #0d5c3b; font-weight: 800; margin-bottom: 5px;'>PINTU PENGISIAN SOAL</h2>
-                    <h3 style='color: #1e3a8a; font-weight: 700; margin-top: 0;'>MI ASHSHOLAHIYAH CILAMAYA</h3>
-                    <p style='color: #64748b; font-size: 0.9rem;'>Silakan masukkan data diri dengan teliti dan penuh semangat untuk memulai ujian!</p>
+                    <h2 style='color: #0d5c3b; font-weight: 800; margin-bottom: 2px; font-size: 1.6rem;'>PINTU PENGISIAN SOAL</h2>
+                    <h3 style='color: #1e3a8a; font-weight: 700; margin-top: 0; font-size: 1.2rem;'>MI ASHSHOLAHIYAH CILAMAYA</h3>
+                    <p style='color: #64748b; font-size: 0.88rem; margin-bottom: 0;'>Silakan masukkan data diri dengan teliti dan penuh semangat untuk memulai ujian!</p>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -401,7 +424,7 @@ if portal == "Portal Siswa":
                     <div style='
                         border: 2px dashed #0d5c3b;
                         border-radius: 10px;
-                        height: 140px;
+                        height: 130px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -415,9 +438,9 @@ if portal == "Portal Siswa":
             with c_info:
                 st.markdown(f"""
                     <div style='padding: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;'>
-                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 10px;'><b>Nama:</b> {str(siswa.get('nama', '')).upper()}</h4>
-                        <p style='margin: 5px 0; font-size: 1.05rem;'><b>Kelas:</b> {siswa.get('kelas', '')} - Rombel {siswa.get('rombel', '')}</p>
-                        <p style='margin: 5px 0; font-size: 1.05rem;'><b>Nomor Peserta:</b> {siswa.get('no_peserta', '')}</p>
+                        <h4 style='color: #0d5c3b; margin-top:0; margin-bottom: 8px;'><b>Nama:</b> {str(siswa.get('nama', '')).upper()}</h4>
+                        <p style='margin: 4px 0; font-size: 1rem;'><b>Kelas:</b> {siswa.get('kelas', '')} - Rombel {siswa.get('rombel', '')}</p>
+                        <p style='margin: 4px 0; font-size: 1rem;'><b>Nomor Peserta:</b> {siswa.get('no_peserta', '')}</p>
                     </div>
                 """, unsafe_allow_html=True)
             
@@ -474,7 +497,7 @@ if portal == "Portal Siswa":
         else:
             st.markdown(f"""
                 <div class='profil-box'>
-                    <span style='font-size: 1.1rem; color: #0d5c3b; font-weight: bold;'>👤 {str(siswa.get('nama', '')).upper()}</span> | 
+                    <span style='font-size: 1.05rem; color: #0d5c3b; font-weight: bold;'>👤 {str(siswa.get('nama', '')).upper()}</span> | 
                     <span><b>Kelas:</b> {siswa.get('kelas')} ({siswa.get('rombel')})</span> | 
                     <span><b>No:</b> {siswa.get('no_peserta')}</span> | 
                     <span style='color: #1e3a8a;'><b>Ujian:</b> {st.session_state.mapel_ujian} - {st.session_state.materi_ujian} ({st.session_state.kategori_ujian})</span>
@@ -515,7 +538,6 @@ if portal == "Portal Siswa":
                     st.markdown(f"#### 📄 Soal No. {curr_page + 1} dari {total_soal}")
                     st.markdown(f"<div class='soal-teks'>{row_soal.get('Teks_Soal', '')}</div>", unsafe_allow_html=True)
 
-                    # Ambil opsi secara dinamis (hanya opsi yang memiliki teks)
                     opsi_list_raw = [
                         ("A", row_soal.get('Opsi_A', '')),
                         ("B", row_soal.get('Opsi_B', '')),
@@ -528,7 +550,6 @@ if portal == "Portal Siswa":
 
                     format_opsi = [f"{huruf}. {teks}" for huruf, teks in opsi_valid]
 
-                    # Sinkronisasi jawaban tersimpan agar tidak hilang saat navigasi/refresh
                     saved_ans = st.session_state.jawaban_siswa.get(curr_page, "")
                     default_idx = 0
                     if saved_ans in format_opsi:
@@ -597,7 +618,6 @@ if portal == "Portal Siswa":
                         c_idx = idx % 4
                         with peta_cols[c_idx]:
                             status_jawab = st.session_state.jawaban_siswa.get(idx)
-                            # Indikator warna tombol dinamis (Primary jika terisi, Secondary jika belum)
                             btn_type = "primary" if status_jawab else "secondary"
                             if st.button(f"{idx+1}", key=f"grid_peta_{idx}", type=btn_type, use_container_width=True):
                                 st.session_state.q_page = idx
