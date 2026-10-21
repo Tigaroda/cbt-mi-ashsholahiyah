@@ -15,10 +15,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Styling CSS Khusus untuk Optimasi Layar Laptop & Widget Sidebar
 st.markdown("""
     <style>
-    /* Mengurangi margin bawaan container utama agar pas di layar laptop */
     .block-container {
         padding-top: 1.5rem !important;
         padding-bottom: 2rem !important;
@@ -26,7 +24,6 @@ st.markdown("""
         padding-right: 2rem !important;
         max-width: 100% !important;
     }
-    
     .main-header {
         text-align: center;
         color: #0d5c3b;
@@ -74,7 +71,6 @@ st.markdown("""
         margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    /* Style Kartu Widget di Sidebar */
     .sidebar-widget {
         background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
         border: 1px solid #bbf7d0;
@@ -82,6 +78,13 @@ st.markdown("""
         padding: 12px;
         margin-top: 20px;
         font-size: 0.88rem;
+    }
+    .stat-card {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -179,17 +182,16 @@ if "jawaban_siswa" not in st.session_state:
     st.session_state.jawaban_siswa = {}
 
 # ==========================================
-# 4. SIDEBAR MENU & WIDGET REAL-TIME DI BAWAH RUANG ADMIN
+# 4. SIDEBAR MENU & WIDGET WAKTU DI BAWAH
 # ==========================================
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
 
 st.sidebar.markdown("---")
-# Widget Hari, Tanggal, Jam, dan Koneksi diletakkan di paling bawah menu sidebar
 with st.sidebar.container():
     tgl_str = datetime.now().strftime('%d %B %Y')
     jam_str = datetime.now().strftime('%H:%M:%S')
-    st.markdown(f"""
+    st.sidebar.markdown(f"""
         <div class='sidebar-widget'>
             <p style='margin: 0; font-weight: bold; color: #0d5c3b;'>🕒 WIDGET SERVER</p>
             <p style='margin: 4px 0 2px 0;'>📅 <b>Hari/Tgl:</b> {tgl_str}</p>
@@ -208,11 +210,14 @@ with st.sidebar.container():
 st.markdown("<div class='main-header'>CBT MI ASHSHOLAHIYAH CILAMAYA</div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-header'>Sistem Ujian Online & Bank Soal Kurikulum Merdeka</div>", unsafe_allow_html=True)
 
+# 14 Mata Pelajaran Kurikulum Merdeka Lengkap
 LIST_MAPEL = [
     "Akidah Akhlak", "Al-Quran Hadits", "Fiqih", "SKI", 
     "Pendidikan Pancasila", "Bahasa Indonesia", "IPAS", "Matematika", 
     "PJOK", "SBdP", "Bahasa Arab", "Bahasa Sunda", "Bahasa Inggris", "Koding dan Kecerdasan Artifisial (KKA)"
 ]
+
+LIST_KATEGORI = ["Latihan", "Ulangan Tengah Semester (UTS)", "Ulangan Semester (UAS)"]
 
 BANK_SOAL_COLS = [
     "Kelas", "Mapel", "Nama_Materi", "Kategori_Ujian", 
@@ -221,7 +226,27 @@ BANK_SOAL_COLS = [
 ]
 
 def render_bank_soal_manager(key_prefix):
-    st.markdown("### 📚 Kelola Bank Soal (14 Mata Pelajaran)")
+    st.markdown("### 📚 Kelola Bank Soal (14 Mata Pelajaran & Kategori Lengkap)")
+    
+    # Bagian Informasi Statistik Jumlah Soal
+    df_bs_stat = read_sheet("BankSoal")
+    if not df_bs_stat.empty and 'Mapel' in df_bs_stat.columns and 'Kategori_Ujian' in df_bs_stat.columns:
+        tot_soal = len(df_bs_stat)
+        tot_pg = len(df_bs_stat[df_bs_stat['Tipe_Soal'].astype(str).str.contains("Pilihan", case=False, na=False)])
+        tot_uts = len(df_bs_stat[df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Tengah", case=False, na=False)])
+        tot_uas = len(df_bs_stat[df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Semester", case=False, na=False) & ~df_bs_stat['Kategori_Ujian'].astype(str).str.contains("Tengah", case=False, na=False)])
+        
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            st.markdown(f"<div class='stat-card'><h4>📦 Total Soal</h4><h2>{tot_soal}</h2></div>", unsafe_allow_html=True)
+        with sc2:
+            st.markdown(f"<div class='stat-card'><h4>🔘 Pilihan Ganda (PG)</h4><h2>{tot_pg}</h2></div>", unsafe_allow_html=True)
+        with sc3:
+            st.markdown(f"<div class='stat-card'><h4>📝 Soal UTS</h4><h2>{tot_uts}</h2></div>", unsafe_allow_html=True)
+        with sc4:
+            st.markdown(f"<div class='stat-card'><h4>📑 Soal UAS</h4><h2>{tot_uas}</h2></div>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
     tab_bs1, tab_bs2, tab_bs3 = st.tabs(["📂 Upload & Template", "➕ Tambah Soal Satuan", "✏️ Edit / Hapus Soal"])
     
     with tab_bs1:
@@ -233,7 +258,7 @@ def render_bank_soal_manager(key_prefix):
             st.download_button("Unduh Template CSV Soal", data=csv_data, file_name="template_bank_soal.csv", mime="text/csv", key=f"{key_prefix}_dl")
         with col_2:
             st.markdown("#### 📤 Upload Soal Massal (.CSV)")
-            up_file = st.file_uploader("Pilih file CSV Bank Soal", type=["csv"], key=f"{key_prefix}_up")
+            up_file = st.file_uploader("Pilih file CSV Bank Soal (Pastikan 14 Mapel & Kategori Sesuai)", type=["csv"], key=f"{key_prefix}_up")
             if up_file is not None:
                 try:
                     try:
@@ -259,10 +284,10 @@ def render_bank_soal_manager(key_prefix):
             c_ts1, c_ts2 = st.columns(2)
             with c_ts1:
                 t_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], key=f"{key_prefix}_t_kls")
-                t_mapel = st.selectbox("Mata Pelajaran", LIST_MAPEL, key=f"{key_prefix}_t_mpl")
+                t_mapel = st.selectbox("Mata Pelajaran (14 Mapel Kurikulum Merdeka)", LIST_MAPEL, key=f"{key_prefix}_t_mpl")
                 t_materi = st.text_input("Nama Materi / Bab", key=f"{key_prefix}_t_mat")
             with c_ts2:
-                t_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_t_kat")
+                t_kategori = st.selectbox("Kategori Ujian", LIST_KATEGORI, key=f"{key_prefix}_t_kat")
                 t_tipe = st.selectbox("Tipe Soal", ["Pilihan Ganda"], key=f"{key_prefix}_t_tip")
                 t_kunci = st.selectbox("Kunci Jawaban", ["A", "B", "C", "D"], key=f"{key_prefix}_t_kun")
             
@@ -299,7 +324,7 @@ def render_bank_soal_manager(key_prefix):
                 e_kelas = st.selectbox("Kelas", ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"], index=0, key=f"{key_prefix}_e_kls")
                 e_mapel = st.selectbox("Mata Pelajaran", LIST_MAPEL, key=f"{key_prefix}_e_mpl")
                 e_materi = st.text_input("Nama Materi", value=str(current_data.get('Nama_Materi', '')), key=f"{key_prefix}_e_mat")
-                e_kategori = st.selectbox("Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_e_kat")
+                e_kategori = st.selectbox("Kategori Ujian", LIST_KATEGORI, key=f"{key_prefix}_e_kat")
                 e_teks = st.text_area("Teks Pertanyaan", value=str(current_data.get('Teks_Soal', '')), key=f"{key_prefix}_e_teks")
                 
                 ec1, ec2 = st.columns(2)
@@ -330,7 +355,7 @@ def render_rekap_nilai_panel(key_prefix):
         with col_f1:
             f_mapel = st.selectbox("Filter Mapel", ["Semua"] + df_nilai['Mapel'].dropna().unique().tolist(), key=f"{key_prefix}_f_mpl")
         with col_f2:
-            f_kat = st.selectbox("Filter Kategori Ujian", ["Semua", "Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key=f"{key_prefix}_f_kat")
+            f_kat = st.selectbox("Filter Kategori Ujian", ["Semua", "Latihan", "Ulangan Tengah Semester (UTS)", "Ulangan Semester (UAS)"], key=f"{key_prefix}_f_kat")
         with col_f3:
             f_kls = st.selectbox("Filter Kelas", ["Semua"] + df_nilai['Kelas'].dropna().unique().tolist(), key=f"{key_prefix}_f_kls")
             
@@ -679,7 +704,7 @@ elif portal == "Ruang Guru Kelas":
                     mat_list = df_b[(df_b['Kelas'] == p_kls) & (df_b['Mapel'] == p_mapel)]['Nama_Materi'].dropna().unique().tolist() if p_mapel != "-" else []
                     p_mat = st.selectbox("Pilih Nama Materi", mat_list if mat_list else ["-"], key="g_mat")
                 with col_g2:
-                    p_kat = st.selectbox("Pilih Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key="g_kat")
+                    p_kat = st.selectbox("Pilih Kategori Ujian", LIST_KATEGORI, key="g_kat")
                     p_dur = st.text_input("Durasi Ujian (Menit)", "90", key="g_dur")
                     p_stat = st.selectbox("Status Pelaksanaan", ["Dibuka (Live)", "Ditutup"], key="g_stat")
                 
@@ -823,7 +848,7 @@ elif portal == "Ruang Admin Master":
                     mat_list_ad = df_b_ad[(df_b_ad['Kelas'] == ad_kls) & (df_b_ad['Mapel'] == ad_mapel)]['Nama_Materi'].dropna().unique().tolist() if ad_mapel != "-" else []
                     ad_mat = st.selectbox("Pilih Nama Materi", mat_list_ad if mat_list_ad else ["-"], key="ad_mat")
                 with col_ad2:
-                    ad_kat = st.selectbox("Pilih Kategori Ujian", ["Latihan", "Ulangan Tengah Semester", "Ulangan Semester"], key="ad_kat")
+                    ad_kat = st.selectbox("Pilih Kategori Ujian", LIST_KATEGORI, key="ad_kat")
                     ad_tok = st.text_input("Token Ujian", "CBT-2026", key="ad_tok")
                     ad_stat = st.selectbox("Status Ujian", ["Dibuka (Live)", "Ditutup"], key="ad_stat")
                 
