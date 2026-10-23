@@ -345,14 +345,10 @@ def render_bank_soal_manager(key_prefix):
                 else:
                     st.warning("Mata Pelajaran dan Teks Pertanyaan wajib diisi.")
 
-    # =========================================================================
-    # TAB 3: TAB PER KELAS & PILIHAN MAPEL (FITUR BARU YANG DIPERLUKAN)
-    # =========================================================================
     with tab_bs3:
         st.markdown("#### 📂 Pilih Kelas Ujian")
         df_bs_all = read_sheet("BankSoal")
         
-        # TAB KELAS 1 SAMPAI KELAS 6
         list_tab_kelas = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"]
         tabs_kelas = st.tabs([f"🏫 {k}" for k in list_tab_kelas])
         
@@ -361,7 +357,6 @@ def render_bank_soal_manager(key_prefix):
                 if not df_bs_all.empty and 'Kelas' in df_bs_all.columns:
                     df_kls_data = df_bs_all[df_bs_all['Kelas'].astype(str).str.lower() == nam_kelas.lower()]
                     
-                    # FILTER MATA PELAJARAN DI DALAM TAB KELAS
                     col_m1, col_m2 = st.columns([2, 1])
                     with col_m1:
                         if not df_kls_data.empty and 'Mapel' in df_kls_data.columns:
@@ -383,9 +378,8 @@ def render_bank_soal_manager(key_prefix):
                         if not df_mapel_data.empty:
                             st.success(f"Ditemukan **{len(df_mapel_data)} Butir Soal** untuk {nam_kelas} - {sel_mapel}")
                             
-                            # MENAMPILKAN SETIAP BUTIR SOAL LENGKAP DENGAN EDIT & HAPUS
                             for idx, row in df_mapel_data.iterrows():
-                                orig_idx = row['index'] # Index baris spreadsheet
+                                orig_idx = row['index']
                                 with st.expander(f"Soal #{idx+1}: {str(row.get('Teks_Soal', ''))[:80]}...", expanded=False):
                                     with st.form(f"form_edit_soal_{key_prefix}_{k_idx}_{orig_idx}"):
                                         ed_teks = st.text_area("Teks Pertanyaan", value=str(row.get('Teks_Soal', '')), key=f"teks_{key_prefix}_{orig_idx}")
@@ -751,36 +745,51 @@ if portal == "Portal Siswa":
                     st.rerun()
 
 # ==========================================
-# B. RUANG GURU KELAS
+# B. RUANG GURU KELAS (LOGIN DENGAN PASSWORD)
 # ==========================================
 elif portal == "Ruang Guru Kelas":
     if st.session_state.user_guru is None:
         st.subheader("👨‍🏫 Login Ruang Guru Kelas")
         df_guru = read_sheet("Guru")
+        
         with st.form("form_login_guru"):
-            u_guru = st.text_input("Nama Guru / ID")
-            p_guru = st.text_input("Password Guru", type="password")
+            input_login = st.text_input("ID Guru / Nama Guru")
+            input_pass = st.text_input("Password", type="password")
+            
             if st.form_submit_button("Masuk Ruang Guru"):
-                if not df_guru.empty and 'nama_guru' in df_guru.columns:
-                    cek_g = df_guru[
-                        (df_guru['nama_guru'].astype(str).str.lower() == u_guru.strip().lower()) &
-                        (df_guru['password'].astype(str) == p_guru.strip())
+                if not df_guru.empty:
+                    cols_lower = {str(c).lower().strip(): c for c in df_guru.columns}
+                    col_id = cols_lower.get('id_guru', df_guru.columns[0])
+                    col_nama = cols_lower.get('nama_guru', df_guru.columns[1] if len(df_guru.columns) > 1 else df_guru.columns[0])
+                    col_pass = cols_lower.get('password', df_guru.columns[4] if len(df_guru.columns) > 4 else None)
+                    
+                    match = df_guru[
+                        (
+                            (df_guru[col_id].astype(str).str.lower().str.strip() == input_login.lower().strip()) | 
+                            (df_guru[col_nama].astype(str).str.lower().str.strip() == input_login.lower().strip())
+                        ) & 
+                        (df_guru[col_pass].astype(str).str.strip() == input_pass.strip() if col_pass else True)
                     ]
-                    if not cek_g.empty:
-                        st.session_state.user_guru = cek_g.iloc[0].to_dict()
+                    
+                    if not match.empty:
+                        st.session_state.user_guru = match.iloc[0].to_dict()
                         st.success("Login Guru Berhasil!")
                         st.rerun()
                     else:
-                        st.error("Nama Guru atau Password Salah.")
+                        st.error("ID Guru, Nama Guru, atau Password salah.")
                 else:
-                    if u_guru == "guru" and p_guru == "123":
-                        st.session_state.user_guru = {"nama_guru": "Guru Kelas", "kelas_ajar": "Kelas 5"}
+                    if input_login.strip() != "":
+                        st.session_state.user_guru = {"id_guru": input_login, "nama_guru": input_login, "mata_pelajaran": "Guru Kelas", "kelas_binaan": "5"}
                         st.rerun()
                     else:
-                        st.error("Data guru belum terhubung.")
+                        st.error("Mohon isi ID/Nama Guru.")
     else:
         guru = st.session_state.user_guru
-        st.subheader(f"👨‍🏫 Dashboard Guru: {guru.get('nama_guru', 'Guru')} ({guru.get('kelas_ajar', '')})")
+        nama_g_disp = guru.get('nama_guru') or guru.get('Nama_Guru') or 'Guru'
+        mapel_g_disp = guru.get('mata_pelajaran') or guru.get('Mata_Pelajaran') or ''
+        kelas_g_disp = guru.get('kelas_binaan') or guru.get('Kelas_Binaan') or ''
+        
+        st.subheader(f"👨‍🏫 Dashboard Guru: {str(nama_g_disp).upper()} | Mapel: {mapel_g_disp} | Kelas Binaan: {kelas_g_disp}")
         
         if st.button("Logout Guru"):
             st.session_state.user_guru = None
@@ -930,13 +939,16 @@ elif portal == "Ruang Admin Master":
             st.markdown("---")
             st.markdown("#### Tambah Guru Baru")
             with st.form("form_add_g"):
-                ng_in = st.text_input("Nama Guru")
-                ka_in = st.text_input("Kelas Ajar")
-                pw_in = st.text_input("Password Guru")
+                ng_in = st.text_input("ID Guru")
+                nm_g_in = st.text_input("Nama Guru")
+                mp_in = st.text_input("Mata Pelajaran", "guru kelas")
+                kb_in = st.text_input("Kelas Binaan", "5")
+                pw_g_in = st.text_input("Password", "123", type="password")
+                
                 if st.form_submit_button("Simpan Guru ke Google Sheets"):
                     if ng_in:
-                        if write_sheet("Guru", [ng_in, ka_in, pw_in, "offline"]):
-                            st.success(f"Guru {ng_in} tersimpan!")
+                        if write_sheet("Guru", [ng_in, nm_g_in, mp_in, kb_in, pw_g_in]):
+                            st.success(f"Guru {nm_g_in} tersimpan!")
                             st.rerun()
                             
         with ta3:
