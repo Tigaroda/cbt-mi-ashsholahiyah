@@ -6,7 +6,7 @@ from datetime import datetime
 import textwrap
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & CSS RESPONSIF LAPTOP
+# 1. KONFIGURASI HALAMAN & CSS RESPONSIF
 # ==========================================
 st.set_page_config(
     page_title="CBT MI Ashsholahiyah Cilamaya",
@@ -205,7 +205,7 @@ if "jawaban_siswa" not in st.session_state:
     st.session_state.jawaban_siswa = {}
 
 # ==========================================
-# 4. SIDEBAR MENU & WIDGET WAKTU DI BAWAH
+# 4. SIDEBAR MENU & WIDGET WAKTU
 # ==========================================
 st.sidebar.title("📌 Menu Navigasi")
 portal = st.sidebar.radio("Pilih Akses Portal:", ["Portal Siswa", "Ruang Guru Kelas", "Ruang Admin Master"])
@@ -280,7 +280,7 @@ def render_bank_soal_manager(key_prefix):
             st.markdown(f"<div class='stat-card'><h4>📑 Soal UAS</h4><h2>{tot_uas}</h2></div>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-    tab_bs1, tab_bs2, tab_bs3 = st.tabs(["📂 Upload & Template", "➕ Tambah Soal Satuan", "🔍 Lihat, Edit & Hapus Soal"])
+    tab_bs1, tab_bs2, tab_bs3 = st.tabs(["📂 Upload & Template", "➕ Tambah Soal Satuan", "🔍 Lihat, Edit & Hapus Soal (Per Kelas & Mapel)"])
     
     with tab_bs1:
         col_1, col_2 = st.columns(2)
@@ -345,84 +345,103 @@ def render_bank_soal_manager(key_prefix):
                 else:
                     st.warning("Mata Pelajaran dan Teks Pertanyaan wajib diisi.")
 
+    # =========================================================================
+    # TAB 3: TAB PER KELAS & PILIHAN MAPEL (FITUR BARU YANG DIPERLUKAN)
+    # =========================================================================
     with tab_bs3:
-        st.markdown("#### 🔍 Filter & Manajemen Soal (Edit / Hapus)")
-        df_bs_manage = read_sheet("BankSoal")
+        st.markdown("#### 📂 Pilih Kelas Ujian")
+        df_bs_all = read_sheet("BankSoal")
         
-        if not df_bs_manage.empty and 'Mapel' in df_bs_manage.columns and 'Kelas' in df_bs_manage.columns:
-            # Tab / Pilihan Kelas
-            kelas_list = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"]
-            sel_kelas = st.selectbox("📂 Pilih Berdasarkan Kelas:", kelas_list, key=f"{key_prefix}_man_kelas")
-            
-            df_kls_filtered = df_bs_manage[df_bs_manage['Kelas'].astype(str).str.lower() == sel_kelas.lower()]
-            
-            if not df_kls_filtered.empty:
-                mapel_list_avail = df_kls_filtered['Mapel'].dropna().unique().tolist()
-                sel_mapel = st.selectbox("📖 Pilih Mata Pelajaran:", mapel_list_avail, key=f"{key_prefix}_man_mapel")
-                
-                df_final_filtered = df_kls_filtered[df_kls_filtered['Mapel'] == sel_mapel].reset_index()
-                
-                if not df_final_filtered.empty:
-                    st.markdown(f"--- \n📌 **Menampilkan {len(df_final_filtered)} soal untuk {sel_kelas} - {sel_mapel}**")
+        # TAB KELAS 1 SAMPAI KELAS 6
+        list_tab_kelas = ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"]
+        tabs_kelas = st.tabs([f"🏫 {k}" for k in list_tab_kelas])
+        
+        for k_idx, nam_kelas in enumerate(list_tab_kelas):
+            with tabs_kelas[k_idx]:
+                if not df_bs_all.empty and 'Kelas' in df_bs_all.columns:
+                    df_kls_data = df_bs_all[df_bs_all['Kelas'].astype(str).str.lower() == nam_kelas.lower()]
                     
-                    for idx, row in df_final_filtered.iterrows():
-                        orig_idx = row['index'] # Index asli di dataframe/spreadsheet (baris sheet = orig_idx + 2)
-                        with st.expander(f"Soal #{idx+1}: {str(row.get('Teks_Soal', ''))[:70]}..."):
-                            with st.form(f"form_edit_del_{key_prefix}_{orig_idx}"):
-                                ed_teks = st.text_area("Teks Pertanyaan", value=str(row.get('Teks_Soal', '')), key=f"edt_t_{key_prefix}_{orig_idx}")
-                                
-                                c_eo1, c_eo2 = st.columns(2)
-                                with c_eo1:
-                                    ed_oa = st.text_input("Opsi A", value=str(row.get('Opsi_A', '')), key=f"edt_oa_{key_prefix}_{orig_idx}")
-                                    ed_oc = st.text_input("Opsi C", value=str(row.get('Opsi_C', '')), key=f"edt_oc_{key_prefix}_{orig_idx}")
-                                with c_eo2:
-                                    ed_ob = st.text_input("Opsi B", value=str(row.get('Opsi_B', '')), key=f"edt_ob_{key_prefix}_{orig_idx}")
-                                    ed_od = st.text_input("Opsi D", value=str(row.get('Opsi_D', '')), key=f"edt_od_{key_prefix}_{orig_idx}")
-                                    
-                                curr_kunci = str(row.get('Kunci', 'A')).upper()
-                                idx_kunci = ["A", "B", "C", "D"].index(curr_kunci) if curr_kunci in ["A", "B", "C", "D"] else 0
-                                ed_kunci = st.selectbox("Kunci Jawaban", ["A", "B", "C", "D"], index=idx_kunci, key=f"edt_k_{key_prefix}_{orig_idx}")
-                                
-                                ed_materi = st.text_input("Nama Materi / Bab", value=str(row.get('Nama_Materi', '')), key=f"edt_m_{key_prefix}_{orig_idx}")
-                                
-                                curr_kat = str(row.get('Kategori_Ujian', LIST_KATEGORI[0]))
-                                idx_kat = LIST_KATEGORI.index(curr_kat) if curr_kat in LIST_KATEGORI else 0
-                                ed_kat = st.selectbox("Kategori Ujian", LIST_KATEGORI, index=idx_kat, key=f"edt_kat_{key_prefix}_{orig_idx}")
-                                
-                                st.markdown("<br>", unsafe_allow_html=True)
-                                col_act1, col_act2 = st.columns(2)
-                                with col_act1:
-                                    btn_save = st.form_submit_button("💾 Simpan Perubahan", type="primary")
-                                with col_act2:
-                                    btn_del = st.form_submit_button("🗑️ Hapus Soal Ini", type="secondary")
-                                    
-                                if btn_save:
-                                    row_num_sheet = orig_idx + 2
-                                    updated_data = [
-                                        sel_kelas, sel_mapel, ed_materi, ed_kat,
-                                        str(row.get('Tipe_Soal', 'Pilihan Ganda')), ed_teks, ed_oa, ed_ob, ed_oc, ed_od, ed_kunci
-                                    ]
-                                    s_up, err_up = update_sheet_row("BankSoal", row_num_sheet, updated_data)
-                                    if s_up:
-                                        st.success("Butir soal berhasil diperbarui!")
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Gagal memperbarui soal: {err_up}")
+                    # FILTER MATA PELAJARAN DI DALAM TAB KELAS
+                    col_m1, col_m2 = st.columns([2, 1])
+                    with col_m1:
+                        if not df_kls_data.empty and 'Mapel' in df_kls_data.columns:
+                            mapel_tersedia = df_kls_data['Mapel'].dropna().unique().tolist()
+                        else:
+                            mapel_tersedia = LIST_MAPEL
+                            
+                        sel_mapel = st.selectbox(
+                            f"📖 Pilih Mata Pelajaran ({nam_kelas}):", 
+                            mapel_tersedia if mapel_tersedia else LIST_MAPEL, 
+                            key=f"{key_prefix}_select_mapel_{k_idx}"
+                        )
+                    
+                    st.markdown("---")
+                    
+                    if not df_kls_data.empty and 'Mapel' in df_kls_data.columns:
+                        df_mapel_data = df_kls_data[df_kls_data['Mapel'] == sel_mapel].reset_index()
+                        
+                        if not df_mapel_data.empty:
+                            st.success(f"Ditemukan **{len(df_mapel_data)} Butir Soal** untuk {nam_kelas} - {sel_mapel}")
+                            
+                            # MENAMPILKAN SETIAP BUTIR SOAL LENGKAP DENGAN EDIT & HAPUS
+                            for idx, row in df_mapel_data.iterrows():
+                                orig_idx = row['index'] # Index baris spreadsheet
+                                with st.expander(f"Soal #{idx+1}: {str(row.get('Teks_Soal', ''))[:80]}...", expanded=False):
+                                    with st.form(f"form_edit_soal_{key_prefix}_{k_idx}_{orig_idx}"):
+                                        ed_teks = st.text_area("Teks Pertanyaan", value=str(row.get('Teks_Soal', '')), key=f"teks_{key_prefix}_{orig_idx}")
                                         
-                                if btn_del:
-                                    row_num_sheet = orig_idx + 2
-                                    s_del, err_del = delete_sheet_row("BankSoal", row_num_sheet)
-                                    if s_del:
-                                        st.success("Butir soal berhasil dihapus dari database!")
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Gagal menghapus soal: {err_del}")
+                                        co1, co2 = st.columns(2)
+                                        with co1:
+                                            ed_oa = st.text_input("Opsi A", value=str(row.get('Opsi_A', '')), key=f"oa_{key_prefix}_{orig_idx}")
+                                            ed_oc = st.text_input("Opsi C", value=str(row.get('Opsi_C', '')), key=f"oc_{key_prefix}_{orig_idx}")
+                                        with co2:
+                                            ed_ob = st.text_input("Opsi B", value=str(row.get('Opsi_B', '')), key=f"ob_{key_prefix}_{orig_idx}")
+                                            ed_od = st.text_input("Opsi D", value=str(row.get('Opsi_D', '')), key=f"od_{key_prefix}_{orig_idx}")
+                                            
+                                        curr_kunci = str(row.get('Kunci', 'A')).upper()
+                                        idx_kunci = ["A", "B", "C", "D"].index(curr_kunci) if curr_kunci in ["A", "B", "C", "D"] else 0
+                                        ed_kunci = st.selectbox("Kunci Jawaban", ["A", "B", "C", "D"], index=idx_kunci, key=f"kunci_{key_prefix}_{orig_idx}")
+                                        
+                                        ed_materi = st.text_input("Nama Materi / Bab", value=str(row.get('Nama_Materi', '')), key=f"materi_{key_prefix}_{orig_idx}")
+                                        
+                                        curr_kat = str(row.get('Kategori_Ujian', LIST_KATEGORI[0]))
+                                        idx_kat = LIST_KATEGORI.index(curr_kat) if curr_kat in LIST_KATEGORI else 0
+                                        ed_kat = st.selectbox("Kategori Ujian", LIST_KATEGORI, index=idx_kat, key=f"kat_{key_prefix}_{orig_idx}")
+                                        
+                                        st.markdown("<br>", unsafe_allow_html=True)
+                                        col_act1, col_act2 = st.columns(2)
+                                        with col_act1:
+                                            btn_save = st.form_submit_button("💾 Simpan Perubahan", type="primary", use_container_width=True)
+                                        with col_act2:
+                                            btn_del = st.form_submit_button("🗑️ Hapus Soal Ini", type="secondary", use_container_width=True)
+                                            
+                                        if btn_save:
+                                            row_num_sheet = orig_idx + 2
+                                            updated_data = [
+                                                nam_kelas, sel_mapel, ed_materi, ed_kat,
+                                                str(row.get('Tipe_Soal', 'Pilihan Ganda')), ed_teks, ed_oa, ed_ob, ed_oc, ed_od, ed_kunci
+                                            ]
+                                            s_up, err_up = update_sheet_row("BankSoal", row_num_sheet, updated_data)
+                                            if s_up:
+                                                st.success("Butir soal berhasil diperbarui di Google Sheets!")
+                                                st.rerun()
+                                            else:
+                                                st.error(f"Gagal memperbarui soal: {err_up}")
+                                                
+                                        if btn_del:
+                                            row_num_sheet = orig_idx + 2
+                                            s_del, err_del = delete_sheet_row("BankSoal", row_num_sheet)
+                                            if s_del:
+                                                st.success("Butir soal berhasil dihapus dari Google Sheets!")
+                                                st.rerun()
+                                            else:
+                                                st.error(f"Gagal menghapus soal: {err_del}")
+                        else:
+                            st.info(f"Belum ada soal tersimpan untuk {nam_kelas} - Mata Pelajaran {sel_mapel}.")
+                    else:
+                        st.info(f"Belum ada data soal tersimpan untuk {nam_kelas}.")
                 else:
-                    st.info(f"Belum ada soal tersimpan untuk mata pelajaran {sel_mapel} pada {sel_kelas}.")
-            else:
-                st.info(f"Belum ada soal tersimpan untuk kelas {sel_kelas}.")
-        else:
-            st.info("Belum ada data Bank Soal di Google Sheets.")
+                    st.info("Database soal belum tersedia di Google Sheets.")
 
 def render_rekap_nilai_panel(key_prefix):
     st.markdown("### 📊 Rekapitulasi Nilai Siswa (Berdasarkan Kategori Ujian)")
